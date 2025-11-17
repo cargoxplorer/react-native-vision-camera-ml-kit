@@ -501,6 +501,12 @@ export interface DocumentScanningResult {
    * Total number of pages scanned
    */
   pageCount: number;
+
+  /**
+   * URI of combined PDF document (if available)
+   * Only available on Android when using ML Kit Document Scanner
+   */
+  pdfUri?: string;
 }
 
 // =============================================================================

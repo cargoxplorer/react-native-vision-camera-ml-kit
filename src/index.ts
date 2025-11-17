@@ -28,6 +28,23 @@ export {
   type CaptureAndRecognizeTextOptions,
 } from './captureAndRecognizeText';
 
-// Feature exports will be added as they are implemented:
-// export { createBarcodeScannerPlugin, useBarcodeScanner } from './barcodeScanning';
-// export { createDocumentScannerPlugin, useDocumentScanner } from './documentScanner';
+// Barcode Scanning
+export {
+  createBarcodeScannerPlugin,
+  useBarcodeScanner,
+} from './barcodeScanning';
+export { scanBarcodeFromImage } from './staticBarcodeScanning';
+export {
+  captureAndScanBarcode,
+  type CaptureAndScanBarcodeOptions,
+} from './captureAndScanBarcode';
+
+// Document Scanner (Android only - UI-based, not a frame processor)
+export { launchDocumentScanner } from './launchDocumentScanner';
+
+// Document Scanner frame processor (experimental - limited functionality)
+// Note: For best results, use launchDocumentScanner() instead
+export {
+  createDocumentScannerPlugin,
+  useDocumentScanner,
+} from './documentScanner';

@@ -17,10 +17,12 @@ class RNVisionCameraMLKitPackage : ReactPackage {
         TextRecognitionPlugin(proxy, options)
       }
 
+      // Barcode Scanning
+      FrameProcessorPluginRegistry.addFrameProcessorPlugin("scanBarcode") { proxy, options ->
+        BarcodeScanningPlugin(proxy, options)
+      }
+
       // Additional plugins will be registered here:
-      // FrameProcessorPluginRegistry.addFrameProcessorPlugin("scanBarcode") { proxy, options ->
-      //   BarcodeScanningPlugin(proxy, options)
-      // }
       // FrameProcessorPluginRegistry.addFrameProcessorPlugin("scanDocument") { proxy, options ->
       //   DocumentScannerPlugin(proxy, options)
       // }
@@ -31,10 +33,9 @@ class RNVisionCameraMLKitPackage : ReactPackage {
 
   override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> {
     return listOf(
-      StaticTextRecognitionModule(reactContext)
-      // Additional modules will be added here:
-      // StaticBarcodeScannerModule(reactContext),
-      // StaticDocumentScannerModule(reactContext),
+      StaticTextRecognitionModule(reactContext),
+      StaticBarcodeScannerModule(reactContext),
+      DocumentScannerModule(reactContext)
     )
   }
 

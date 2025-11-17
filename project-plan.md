@@ -28,8 +28,8 @@ Standalone React Native Vision Camera plugin integrating Google ML Kit with thre
 |-------|--------|----------|
 | Phase 1: Project Setup & Infrastructure | 🟢 Complete | 100% |
 | Phase 2: Text Recognition v2 (Android) | 🟢 Complete | 100% |
-| Phase 3: Barcode Scanning (Android) | ⚪ Not Started | 0% |
-| Phase 4: Document Scanner (Android) | ⚪ Not Started | 0% |
+| Phase 3: Barcode Scanning (Android) | 🟢 Complete | 100% |
+| Phase 4: Document Scanner (Android) | 🟢 Complete | 100% |
 | Phase 5: Integration & Polish (Android) | ⚪ Not Started | 0% |
 | Phase 6: Example App (Android) | ⚪ Not Started | 0% |
 | Phase 7: iOS Implementation | ⚪ Not Started | 0% |
@@ -125,34 +125,68 @@ Standalone React Native Vision Camera plugin integrating Google ML Kit with thre
 
 ## Phase 3: Barcode Scanning (Android - TDD)
 
-**Status:** ⚪ Not Started
+**Status:** 🟢 Complete
+**Started:** 2025-11-17
+**Completed:** 2025-11-17
 
-### Tasks
-- [ ] Write unit tests
-- [ ] Create src/barcodeScanning.ts
-- [ ] Implement createBarcodeScannerPlugin()
-- [ ] Implement useBarcodeScanner() hook
-- [ ] Create BarcodeScanningPlugin.kt
-- [ ] Implement frame processor
-- [ ] Implement static image API
-- [ ] Implement photo capture helper
-- [ ] All tests passing
+### Tasks ✅
+- [x] Write comprehensive unit tests (21 tests)
+- [x] Create src/barcodeScanning.ts
+- [x] Implement createBarcodeScannerPlugin()
+- [x] Implement useBarcodeScanner() hook
+- [x] Create BarcodeScanningPlugin.kt with format filtering
+- [x] Implement frame processor with all formats (1D and 2D)
+- [x] Implement structured data extraction (WiFi, Contact, URL, etc.)
+- [x] Create StaticBarcodeScannerModule.kt
+- [x] Implement static image API (scanBarcodeFromImage)
+- [x] Implement photo capture helper (captureAndScanBarcode)
+- [x] Register plugin and module in Package
+- [x] Export all APIs from index.ts
+- [x] All 61 tests passing
+
+### Deliverables
+- **Frame Processor:** `scanBarcode` plugin supporting all 1D and 2D formats
+- **Format Filtering:** Optional format restriction for improved performance
+- **Structured Data:** Automatic extraction of WiFi, URLs, Contacts, Calendar events, Driver licenses
+- **Static Image API:** `scanBarcodeFromImage()` for processing saved images
+- **Photo Capture Helper:** `captureAndScanBarcode()` for snap-and-scan functionality
+- **Full type safety:** Comprehensive TypeScript types for all barcode formats and data structures
+- **Logging:** Performance tracking and debugging support
 
 ---
 
 ## Phase 4: Document Scanner (Android Only - TDD)
 
-**Status:** ⚪ Not Started
+**Status:** 🟢 Complete
+**Started:** 2025-11-17
+**Completed:** 2025-11-17
 
-### Tasks
-- [ ] Write unit tests
-- [ ] Create src/documentScanner.ts
-- [ ] Implement createDocumentScannerPlugin()
-- [ ] Implement useDocumentScanner() hook
-- [ ] Create DocumentScannerPlugin.kt
-- [ ] Implement scanner integration
-- [ ] Implement static API (if applicable)
-- [ ] All tests passing
+### Tasks ✅
+- [x] Write comprehensive unit tests (21 tests)
+- [x] Create src/documentScanner.ts (frame processor API)
+- [x] Implement createDocumentScannerPlugin()
+- [x] Implement useDocumentScanner() hook
+- [x] Create DocumentScannerModule.kt (UI-based scanner)
+- [x] Implement ML Kit Document Scanner integration
+- [x] Support all scanner modes (BASE, BASE_WITH_FILTER, FULL)
+- [x] Create launchDocumentScanner() function (recommended API)
+- [x] Handle multi-page scanning
+- [x] PDF generation support
+- [x] Gallery import support
+- [x] Register module in Package
+- [x] Export all APIs from index.ts
+- [x] All 82 tests passing
+
+### Deliverables
+- **UI-Based Scanner:** `launchDocumentScanner()` - Launches ML Kit's document scanner UI (recommended)
+- **Frame Processor:** `scanDocument` plugin (experimental, limited functionality)
+- **Scanner Modes:** BASE, BASE_WITH_FILTER, FULL (with ML-powered cleaning)
+- **Multi-page:** Configurable page limit
+- **Gallery Import:** Optional gallery import for existing documents
+- **PDF Output:** Automatic PDF generation with scanned pages
+- **Full type safety:** Comprehensive TypeScript types
+- **Logging:** Performance tracking and debugging support
+- **Platform:** Android only (iOS not supported by Google)
 
 ---
 
