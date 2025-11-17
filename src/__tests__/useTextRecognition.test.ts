@@ -7,24 +7,26 @@ import { useTextRecognition } from '../textRecognition';
 import { TextRecognitionScript } from '../types';
 import { mockVisionCameraProxy, mockPlugin } from './__mocks__/VisionCameraProxy';
 
-// Mock React's useMemo to track calls
-let memoizedValue: any = null;
-let lastDeps: any[] = [];
+// Create a mock state tracker for useMemo
+const mockMemoState = {
+  memoizedValue: null as any,
+  mockLastDeps: [] as any[],
+};
 
 jest.mock('react', () => ({
   ...jest.requireActual('react'),
   useMemo: (factory: () => any, deps: any[]) => {
     // Simulate useMemo behavior: only call factory if deps changed
     const depsChanged =
-      lastDeps.length === 0 ||
-      deps.length !== lastDeps.length ||
-      deps.some((dep, i) => dep !== lastDeps[i]);
+      mockMemoState.mockLastDeps.length === 0 ||
+      deps.length !== mockMemoState.mockLastDeps.length ||
+      deps.some((dep, i) => dep !== mockMemoState.mockLastDeps[i]);
 
     if (depsChanged) {
-      memoizedValue = factory();
-      lastDeps = deps;
+      mockMemoState.memoizedValue = factory();
+      mockMemoState.mockLastDeps = deps;
     }
-    return memoizedValue;
+    return mockMemoState.memoizedValue;
   },
 }));
 
@@ -32,8 +34,8 @@ describe('useTextRecognition', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockVisionCameraProxy.initFrameProcessorPlugin.mockReturnValue(mockPlugin);
-    memoizedValue = null;
-    lastDeps = [];
+    mockMemoState.memoizedValue = null;
+    mockMemoState.mockLastDeps = [];
   });
 
   it('should create text recognition plugin', () => {
@@ -90,7 +92,7 @@ describe('useTextRecognition', () => {
     );
 
     // Reset memoization
-    lastDeps = [];
+    mockMemoState.mockLastDeps = [];
 
     useTextRecognition(options2);
     expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledTimes(

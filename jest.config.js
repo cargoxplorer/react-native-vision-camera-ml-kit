@@ -8,6 +8,12 @@ module.exports = {
     '<rootDir>/src/**/__tests__/**/*.{js,jsx,ts,tsx}',
     '<rootDir>/src/**/*.(test|spec).{js,jsx,ts,tsx}',
   ],
+  testPathIgnorePatterns: [
+    '<rootDir>/node_modules/',
+    '<rootDir>/lib/',
+    '<rootDir>/src/__tests__/__mocks__/',
+    '<rootDir>/src/__tests__/setup.ts',
+  ],
   collectCoverageFrom: [
     'src/**/*.{js,jsx,ts,tsx}',
     '!src/**/*.d.ts',
