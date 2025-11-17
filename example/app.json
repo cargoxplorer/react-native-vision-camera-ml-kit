@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "ML Kit Example",
+    "slug": "react-native-vision-camera-ml-kit-example",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.example.mlkit",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app needs camera access to demonstrate ML Kit features",
+        "NSMicrophoneUsageDescription": "This app needs microphone access for video recording"
+      }
+    },
+    "android": {
+      "package": "com.example.mlkit",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://example.com"
+        }
+      ],
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "$(PRODUCT_NAME) needs camera access to demonstrate ML Kit features",
+          "enableMicrophonePermission": true
+        }
+      ]
+    ]
+  }
+}
