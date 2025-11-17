@@ -82,7 +82,7 @@ export function createTextRecognitionPlugin(
       const frameStartTime = performance.now();
 
       try {
-        const result = plugin.call(frame) as TextRecognitionResult | null;
+        const result = plugin.call(frame) as unknown as TextRecognitionResult | null;
 
         const processingTime = performance.now() - frameStartTime;
         Logger.performance('Text recognition frame processing', processingTime);

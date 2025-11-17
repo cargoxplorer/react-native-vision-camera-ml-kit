@@ -4,7 +4,7 @@
   "description": "React Native Vision Camera frame processor plugin for Google ML Kit (Text Recognition v2, Document Scanner, Barcode Scanning)",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
-  "types": "lib/typescript/src/index.d.ts",
+  "types": "lib/typescript/index.d.ts",
   "react-native": "src/index",
   "source": "src/index",
   "private": true,

@@ -2,8 +2,10 @@
  * TypeScript type definitions for react-native-vision-camera-ml-kit
  */
 
+import type { Frame as VisionCameraFrame } from 'react-native-vision-camera';
+
 // Re-export Frame type from react-native-vision-camera
-export type { Frame } from 'react-native-vision-camera';
+export type Frame = VisionCameraFrame;
 
 // =============================================================================
 // Common Types

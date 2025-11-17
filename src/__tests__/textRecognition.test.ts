@@ -89,7 +89,7 @@ describe('createTextRecognitionPlugin', () => {
 
   describe('error handling', () => {
     it('should throw error when plugin initialization fails', () => {
-      mockVisionCameraProxy.initFrameProcessorPlugin.mockReturnValue(null);
+      mockVisionCameraProxy.initFrameProcessorPlugin.mockReturnValue(null as any);
 
       expect(() => createTextRecognitionPlugin()).toThrow(
         "Failed to initialize Text Recognition plugin. Make sure 'react-native-vision-camera-ml-kit' is properly installed and linked."
@@ -97,7 +97,7 @@ describe('createTextRecognitionPlugin', () => {
     });
 
     it('should throw error when plugin is undefined', () => {
-      mockVisionCameraProxy.initFrameProcessorPlugin.mockReturnValue(undefined);
+      mockVisionCameraProxy.initFrameProcessorPlugin.mockReturnValue(undefined as any);
 
       expect(() => createTextRecognitionPlugin()).toThrow();
     });
