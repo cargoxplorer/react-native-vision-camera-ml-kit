@@ -36,7 +36,7 @@ class BarcodeScanningPlugin(
         val formats = options?.get("formats") as? List<*>
         val scannerOptions = if (formats != null && formats.isNotEmpty()) {
             val barcodeFormats = formats.mapNotNull { formatString ->
-                parseBarcode Format(formatString.toString())
+                parseBarcodeFormat(formatString.toString())
             }
 
             if (barcodeFormats.isEmpty()) {

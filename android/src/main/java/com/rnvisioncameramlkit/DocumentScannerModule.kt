@@ -101,8 +101,8 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
             val scanner: GmsDocumentScanner = GmsDocumentScanning.getClient(scannerOptions)
 
             // Launch scanner
-            scanner.getStartIntent()
-                .addOnSuccessListener { intentSender ->
+            scanner.getStartScanIntent(currentActivity)
+                .addOnSuccessListener { intentSender: android.content.IntentSender ->
                     currentActivity.startIntentSenderForResult(
                         intentSender,
                         DOCUMENT_SCAN_REQUEST_CODE,
@@ -112,9 +112,10 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
                         0
                     )
                 }
-                .addOnFailureListener { e ->
+                .addOnFailureListener { e: Exception ->
                     Logger.error("Failed to start document scanner", e)
-                    scannerPromise?.reject("SCANNER_START_FAILED", "Failed to start scanner: ${e.message}", e)
+                    val errorMessage = "Failed to start scanner: ${e.message}"
+                    scannerPromise?.reject("SCANNER_START_FAILED", errorMessage, e)
                     scannerPromise = null
                 }
 
