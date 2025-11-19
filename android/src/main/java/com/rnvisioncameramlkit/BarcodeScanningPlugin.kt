@@ -32,6 +32,7 @@ class BarcodeScanningPlugin(
     private var detectInvertedBarcodes: Boolean = false
     private var frameSkipInterval: Int = 1  // Process every frame by default (0 = skip none)
     private var frameCounter: Int = 0
+    private var tryRotations: Boolean = true  // Try 90 degree rotation if no barcodes found (default: enabled)
     // Reusable buffers to avoid per-frame allocations during inversion
     // Note: Only Y buffer needed since we use grayscale (not YUV→RGB)
     private var invertedYBuffer: ByteArray? = null
@@ -56,6 +57,13 @@ class BarcodeScanningPlugin(
         frameSkipInterval = (options?.get("skipFrames") as? Number)?.toInt() ?: 1
         if (frameSkipInterval > 1) {
             Logger.info("Frame skipping enabled: processing 1 in $frameSkipInterval frames (~${(frameSkipInterval - 1) * 16}ms reduction)")
+        }
+
+        // 90 degree rotation attempts: try both current rotation and 90 degrees (default: enabled)
+        // Set tryRotations=false if camera orientation is fixed to skip secondary rotation attempts
+        tryRotations = options?.get("tryRotations") as? Boolean ?: true
+        if (!tryRotations) {
+            Logger.info("90 degree rotation attempts DISABLED - only using current camera rotation (saves ~10-20ms per frame)")
         }
 
         val formats = options?.get("formats") as? List<*>
@@ -135,8 +143,12 @@ class BarcodeScanningPlugin(
                 Logger.debug("Processing frame: ${frame.width}x${frame.height}, rotation: $baseRotation")
             }
 
-            // Try scanning at current rotation and 90 degree rotation
-            val rotations = listOf(baseRotation, (baseRotation + 90) % 360)
+            // Try scanning at current rotation and optionally 90 degree rotation
+            val rotations = if (tryRotations) {
+                listOf(baseRotation, (baseRotation + 90) % 360)
+            } else {
+                listOf(baseRotation)  // Only try current rotation
+            }
             var barcodes: List<Barcode> = emptyList()
 
             // 1. Try normal image at current rotation
@@ -148,8 +160,8 @@ class BarcodeScanningPlugin(
                 if (Logger.isDebugEnabled()) {
                     Logger.debug("Found ${barcodes.size} barcode(s) at rotation ${rotations[0]}")
                 }
-            } else {
-                // 2. Try normal image at 90 degree rotation
+            } else if (tryRotations && rotations.size > 1) {
+                // 2. Try normal image at 90 degree rotation (only if tryRotations is enabled)
                 if (Logger.isDebugEnabled()) {
                     Logger.debug("No barcodes at rotation ${rotations[0]}, trying ${rotations[1]}")
                 }
@@ -183,27 +195,24 @@ class BarcodeScanningPlugin(
                         if (Logger.isDebugEnabled()) {
                             Logger.debug("Found ${barcodes.size} barcode(s) in inverted image at rotation ${rotations[0]}")
                         }
-                    } else {
-                        // Try inverted at 90 degree rotation
+                    } else if (tryRotations && rotations.size > 1) {
+                        // Try inverted at 90 degree rotation (only if tryRotations is enabled)
                         if (Logger.isDebugEnabled()) {
                             Logger.debug("No barcodes in inverted at ${rotations[0]}, trying ${rotations[1]}")
                         }
 
-                        // Only try second rotation if it's actually different
-                        if (rotations[1] != rotations[0]) {
-                            val invertedImage90 = InputImage.fromBitmap(invertedBitmap, rotations[1])
-                            val invertedTask90: Task<List<Barcode>> = scanner.process(invertedImage90)
-                            barcodes = Tasks.await(invertedTask90)
+                        val invertedImage90 = InputImage.fromBitmap(invertedBitmap, rotations[1])
+                        val invertedTask90: Task<List<Barcode>> = scanner.process(invertedImage90)
+                        barcodes = Tasks.await(invertedTask90)
 
-                            if (barcodes.isNotEmpty() && Logger.isDebugEnabled()) {
-                                Logger.debug("Found ${barcodes.size} barcode(s) in inverted image at rotation ${rotations[1]}")
-                            }
+                        if (barcodes.isNotEmpty() && Logger.isDebugEnabled()) {
+                            Logger.debug("Found ${barcodes.size} barcode(s) in inverted image at rotation ${rotations[1]}")
                         }
                     }
                 }
 
                 val invertTime = System.currentTimeMillis() - startInvertTime
-                Logger.performance("Inverted image scan (both rotations)", invertTime)
+                Logger.performance("Inverted image scan", invertTime)
             }
 
             val processingTime = System.currentTimeMillis() - startTime

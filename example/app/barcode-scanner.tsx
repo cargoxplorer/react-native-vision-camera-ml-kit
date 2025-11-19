@@ -25,6 +25,7 @@ export default function BarcodeScannerScreen() {
   const [barcodes, setBarcodes] = useState<Barcode[]>([]);
   const [filterQROnly, setFilterQROnly] = useState(false);
   const [detectInverted, setDetectInverted] = useState(false);
+  const [tryRotations, setTryRotations] = useState(true);
   const [isActive, setIsActive] = useState(true);
 
   const device = useCameraDevice('back');
@@ -36,8 +37,9 @@ export default function BarcodeScannerScreen() {
     () => ({
       formats: filterQROnly ? [BarcodeFormat.QR_CODE] : undefined,
       detectInvertedBarcodes: detectInverted,
+      tryRotations: tryRotations,
     }),
-    [filterQROnly, detectInverted]
+    [filterQROnly, detectInverted, tryRotations]
   );
   const { scanBarcode } = useBarcodeScanner(barcodeOptions);
 
@@ -158,6 +160,23 @@ export default function BarcodeScannerScreen() {
             {detectInverted ? 'Inverted ✓' : 'Normal Only'}
           </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            tryRotations && styles.filterButtonActive,
+          ]}
+          onPress={() => setTryRotations(!tryRotations)}
+        >
+          <Text
+            style={[
+              styles.filterButtonText,
+              tryRotations && styles.filterButtonTextActive,
+            ]}
+          >
+            {tryRotations ? 'Rotations ✓' : '0° Only'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.results}>
@@ -252,13 +271,17 @@ const styles = StyleSheet.create({
     padding: 12,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
-    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   filterButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 8,
     backgroundColor: '#f0f0f0',
+    marginHorizontal: 4,
   },
   filterButtonActive: {
     backgroundColor: '#007AFF',
