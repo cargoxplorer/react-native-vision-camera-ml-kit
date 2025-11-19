@@ -78,31 +78,12 @@ export function createTextRecognitionPlugin(
      */
     scanText: (frame: Frame): TextRecognitionResult | null => {
       'worklet';
-
-      const frameStartTime = performance.now();
-
       try {
         const result = plugin.call(frame) as unknown as TextRecognitionResult | null;
-
-        const processingTime = performance.now() - frameStartTime;
-        Logger.performance('Text recognition frame processing', processingTime);
-
-        if (result && result.text) {
-          Logger.debug(
-            `Text recognized: "${result.text.substring(0, 50)}${
-              result.text.length > 50 ? '...' : ''
-            }"`
-          );
-        }
-
         return result;
-      } catch (error) {
-        const processingTime = performance.now() - frameStartTime;
-        Logger.error('Error during text recognition', error);
-        Logger.performance(
-          'Text recognition frame processing (error)',
-          processingTime
-        );
+      } catch (e) {
+        // If the native plugin throws, surface a graceful null result in the
+        // worklet context instead of propagating a JS error.
         return null;
       }
     },

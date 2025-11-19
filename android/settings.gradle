@@ -1,0 +1,22 @@
+rootProject.name = "react-native-vision-camera-ml-kit-android"
+
+buildscript {
+  repositories {
+    google()
+    mavenCentral()
+  }
+  dependencies {
+    classpath('com.android.tools.build:gradle')
+    classpath('com.facebook.react:react-native-gradle-plugin')
+  }
+}
+
+apply plugin: "com.facebook.react.rootproject"
+
+// Expose VisionCamera as a Gradle project so this library can depend on it
+include(":react-native-vision-camera")
+project(":react-native-vision-camera").projectDir = new File(rootDir, "../node_modules/react-native-vision-camera/android")
+
+
+
+

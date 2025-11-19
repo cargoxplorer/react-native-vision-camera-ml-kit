@@ -5,18 +5,28 @@ buildscript {
     mavenCentral()
   }
   dependencies {
+    classpath('com.android.tools.build:gradle')
+    classpath('com.facebook.react:react-native-gradle-plugin')
     classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
   }
 }
 
+def isNewArchitectureEnabled() {
+  return rootProject.hasProperty("newArchEnabled") && rootProject.getProperty("newArchEnabled") == "true"
+}
+
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
+if (isNewArchitectureEnabled()) {
+  apply plugin: "com.facebook.react"
+}
 
 def safeExtGet(prop, fallback) {
   rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
 }
 
 android {
+  ndkVersion safeExtGet('ndkVersion', '26.1.10909125')
   namespace "com.rnvisioncameramlkit"
   compileSdkVersion safeExtGet('compileSdkVersion', 36)
 
@@ -25,6 +35,11 @@ android {
     targetSdkVersion safeExtGet('targetSdkVersion', 36)
     versionCode 1
     versionName "0.1.0"
+    externalNativeBuild {
+      cmake {
+        cppFlags "-fexceptions", "-frtti", "-std=c++17"
+      }
+    }
   }
 
   buildTypes {
@@ -50,18 +65,25 @@ android {
 }
 
 repositories {
+  // React Native Android artifacts are published inside node_modules
+  maven {
+    url(new File(['node', '--print', "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim(), '../android'))
+  }
   google()
   mavenCentral()
+  // Additional Maven repo used by some React Native libraries
+  maven { url 'https://www.jitpack.io' }
 }
 
 dependencies {
   // Kotlin
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 
-  // React Native
-  implementation 'com.facebook.react:react-native:+'
+  // React Native Android
+  implementation "com.facebook.react:react-native:+"
 
-  // Vision Camera
+  // VisionCamera - depend on the Gradle project provided by the app via autolinking
+  // (this is how React Native normally wires native modules)
   implementation project(':react-native-vision-camera')
 
   // ML Kit - Text Recognition v2

@@ -43,9 +43,9 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
      */
     @ReactMethod
     fun scanDocument(options: ReadableMap, promise: Promise) {
-        val currentActivity = currentActivity
+        val activity = reactApplicationContext.currentActivity
 
-        if (currentActivity == null) {
+        if (activity == null) {
             promise.reject("NO_ACTIVITY", "Activity is null")
             return
         }
@@ -101,9 +101,9 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
             val scanner: GmsDocumentScanner = GmsDocumentScanning.getClient(scannerOptions)
 
             // Launch scanner
-            scanner.getStartScanIntent(currentActivity)
+            scanner.getStartScanIntent(activity)
                 .addOnSuccessListener { intentSender: android.content.IntentSender ->
-                    currentActivity.startIntentSenderForResult(
+                    activity.startIntentSenderForResult(
                         intentSender,
                         DOCUMENT_SCAN_REQUEST_CODE,
                         null,
@@ -127,7 +127,7 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     }
 
     override fun onActivityResult(
-        activity: Activity?,
+        activity: Activity,
         requestCode: Int,
         resultCode: Int,
         data: Intent?
@@ -188,7 +188,7 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
         }
     }
 
-    override fun onNewIntent(intent: Intent?) {
+    override fun onNewIntent(intent: Intent) {
         // Not used
     }
 }
