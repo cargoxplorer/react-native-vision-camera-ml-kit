@@ -30,10 +30,11 @@ class BarcodeScanningPlugin(
 
     private var scanner: BarcodeScanner
     private var detectInvertedBarcodes: Boolean = false
+    private var frameSkipInterval: Int = 1  // Process every frame by default (0 = skip none)
+    private var frameCounter: Int = 0
     // Reusable buffers to avoid per-frame allocations during inversion
+    // Note: Only Y buffer needed since we use grayscale (not YUV→RGB)
     private var invertedYBuffer: ByteArray? = null
-    private var invertedUBuffer: ByteArray? = null
-    private var invertedVBuffer: ByteArray? = null
     private var rgbIntBuffer: IntArray? = null
 
     init {
@@ -42,7 +43,14 @@ class BarcodeScanningPlugin(
         // Extract options
         detectInvertedBarcodes = options?.get("detectInvertedBarcodes") as? Boolean ?: false
         if (detectInvertedBarcodes) {
-            Logger.info("Inverted barcode detection enabled")
+            Logger.warn("⚠️ Inverted barcode detection ENABLED - adds 30-40ms per frame when no barcodes found. Only enable if you specifically need white-on-black barcodes.")
+        }
+
+        // Frame skipping: process every Nth frame (default: every frame)
+        // Set skipFrames=1 to process every 2nd frame, skipFrames=2 for every 3rd, etc.
+        frameSkipInterval = (options?.get("skipFrames") as? Number)?.toInt() ?: 1
+        if (frameSkipInterval > 1) {
+            Logger.info("Frame skipping enabled: processing 1 in $frameSkipInterval frames (~${(frameSkipInterval - 1) * 16}ms reduction)")
         }
 
         val formats = options?.get("formats") as? List<*>
@@ -89,10 +97,20 @@ class BarcodeScanningPlugin(
         val startTime = System.currentTimeMillis()
 
         try {
+            // Skip frames for performance optimization
+            if (frameSkipInterval > 1) {
+                frameCounter++
+                if (frameCounter % frameSkipInterval != 0) {
+                    return null  // Skip this frame
+                }
+            }
+
             val mediaImage: Image = frame.image
             val baseRotation = frame.imageProxy.imageInfo.rotationDegrees
 
-            Logger.debug("Processing frame: ${frame.width}x${frame.height}, rotation: $baseRotation")
+            if (Logger.isDebugEnabled()) {
+                Logger.debug("Processing frame: ${frame.width}x${frame.height}, rotation: $baseRotation")
+            }
 
             // Try scanning at current rotation and 90 degree rotation
             val rotations = listOf(baseRotation, (baseRotation + 90) % 360)
@@ -104,22 +122,28 @@ class BarcodeScanningPlugin(
             barcodes = Tasks.await(task)
 
             if (barcodes.isNotEmpty()) {
-                Logger.debug("Found ${barcodes.size} barcode(s) at rotation ${rotations[0]}")
+                if (Logger.isDebugEnabled()) {
+                    Logger.debug("Found ${barcodes.size} barcode(s) at rotation ${rotations[0]}")
+                }
             } else {
                 // 2. Try normal image at 90 degree rotation
-                Logger.debug("No barcodes at rotation ${rotations[0]}, trying ${rotations[1]}")
+                if (Logger.isDebugEnabled()) {
+                    Logger.debug("No barcodes at rotation ${rotations[0]}, trying ${rotations[1]}")
+                }
                 val image90 = InputImage.fromMediaImage(mediaImage, rotations[1])
                 val task90: Task<List<Barcode>> = scanner.process(image90)
                 barcodes = Tasks.await(task90)
 
-                if (barcodes.isNotEmpty()) {
+                if (barcodes.isNotEmpty() && Logger.isDebugEnabled()) {
                     Logger.debug("Found ${barcodes.size} barcode(s) at rotation ${rotations[1]}")
                 }
             }
 
             // 3. If no barcodes found and inverted detection is enabled, try inverted images
             if (barcodes.isEmpty() && detectInvertedBarcodes) {
-                Logger.debug("No barcodes in normal image, attempting inverted image scan...")
+                if (Logger.isDebugEnabled()) {
+                    Logger.debug("No barcodes in normal image, attempting inverted image scan...")
+                }
 
                 val startInvertTime = System.currentTimeMillis()
 
@@ -133,10 +157,14 @@ class BarcodeScanningPlugin(
                     barcodes = Tasks.await(invertedTask)
 
                     if (barcodes.isNotEmpty()) {
-                        Logger.debug("Found ${barcodes.size} barcode(s) in inverted image at rotation ${rotations[0]}")
+                        if (Logger.isDebugEnabled()) {
+                            Logger.debug("Found ${barcodes.size} barcode(s) in inverted image at rotation ${rotations[0]}")
+                        }
                     } else {
                         // Try inverted at 90 degree rotation
-                        Logger.debug("No barcodes in inverted at ${rotations[0]}, trying ${rotations[1]}")
+                        if (Logger.isDebugEnabled()) {
+                            Logger.debug("No barcodes in inverted at ${rotations[0]}, trying ${rotations[1]}")
+                        }
 
                         // Only try second rotation if it's actually different
                         if (rotations[1] != rotations[0]) {
@@ -144,7 +172,7 @@ class BarcodeScanningPlugin(
                             val invertedTask90: Task<List<Barcode>> = scanner.process(invertedImage90)
                             barcodes = Tasks.await(invertedTask90)
 
-                            if (barcodes.isNotEmpty()) {
+                            if (barcodes.isNotEmpty() && Logger.isDebugEnabled()) {
                                 Logger.debug("Found ${barcodes.size} barcode(s) in inverted image at rotation ${rotations[1]}")
                             }
                         }
@@ -159,11 +187,15 @@ class BarcodeScanningPlugin(
             Logger.performance("Barcode scanning processing", processingTime)
 
             if (barcodes.isEmpty()) {
-                Logger.debug("No barcodes detected in frame (tried all rotations)")
+                if (Logger.isDebugEnabled()) {
+                    Logger.debug("No barcodes detected in frame (tried all rotations)")
+                }
                 return null
             }
 
-            Logger.debug("Barcodes detected: ${barcodes.size} barcode(s)")
+            if (Logger.isDebugEnabled()) {
+                Logger.debug("Barcodes detected: ${barcodes.size} barcode(s)")
+            }
 
             val result = WritableNativeMap().apply {
                 putArray("barcodes", processBarcodes(barcodes))

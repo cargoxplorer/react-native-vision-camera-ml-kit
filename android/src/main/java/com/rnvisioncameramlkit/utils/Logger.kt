@@ -34,6 +34,11 @@ object Logger {
   fun getLogLevel(): LogLevel = currentLogLevel
 
   /**
+   * Check if debug logging is enabled (for conditional log checks to avoid string allocations)
+   */
+  fun isDebugEnabled(): Boolean = currentLogLevel.priority <= LogLevel.DEBUG.priority
+
+  /**
    * Log a debug message
    */
   fun debug(message: String, tag: String = TAG) {
