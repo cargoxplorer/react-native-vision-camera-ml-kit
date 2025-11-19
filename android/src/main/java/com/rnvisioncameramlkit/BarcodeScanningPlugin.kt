@@ -248,21 +248,44 @@ class BarcodeScanningPlugin(
             }
             val yData = invertedYBuffer!!
 
-            // Copy and invert Y plane respecting stride
+            // Copy and invert Y plane.
+            // FAST PATH: contiguous Y plane (most devices) -> bulk copy + tight loop
             val yBuffer = yPlane.buffer
             yBuffer.rewind()
 
-            for (row in 0 until height) {
-                for (col in 0 until width) {
-                    val bufferIndex = row * yRowStride + col * yPixelStride
-                    val arrayIndex = row * width + col
-                    val value = yBuffer.get(bufferIndex).toInt() and 0xFF
-                    // INVERT: brightness (0->255, 255->0) using integer math
-                    yData[arrayIndex] = (255 - value).toByte()
+            if (yPixelStride == 1 && yRowStride == width) {
+                // Contiguous layout, we can read all pixels in one go.
+                if (yBuffer.hasArray() && yBuffer.arrayOffset() == 0 && yBuffer.capacity() >= requiredYSize) {
+                    val src = yBuffer.array()
+                    for (i in 0 until requiredYSize) {
+                        yData[i] = (255 - (src[i].toInt() and 0xFF)).toByte()
+                    }
+                } else {
+                    // Fallback to copying into a temporary array first.
+                    val tmp = ByteArray(requiredYSize)
+                    yBuffer.get(tmp, 0, requiredYSize)
+                    for (i in 0 until requiredYSize) {
+                        yData[i] = (255 - (tmp[i].toInt() and 0xFF)).toByte()
+                    }
+                }
+            } else {
+                // GENERIC PATH: handle arbitrary row/pixel strides safely.
+                for (row in 0 until height) {
+                    val rowBase = row * yRowStride
+                    var colBase = rowBase
+                    val arrayRowOffset = row * width
+                    for (col in 0 until width) {
+                        val value = yBuffer.get(colBase).toInt() and 0xFF
+                        // INVERT: brightness (0->255, 255->0) using integer math
+                        yData[arrayRowOffset + col] = (255 - value).toByte()
+                        colBase += yPixelStride
+                    }
                 }
             }
 
-            Logger.debug("Created inverted grayscale bitmap: ${width}x${height}, Y plane inverted (stride-aware)")
+            if (Logger.isDebugEnabled()) {
+                Logger.debug("Created inverted grayscale bitmap: ${width}x${height}, Y plane inverted (fastPath=${yPixelStride == 1 && yRowStride == width})")
+            }
 
             // Convert inverted Y plane to grayscale Bitmap for ML Kit
             yToGrayscaleBitmap(width, height, yData)
