@@ -38,6 +38,13 @@ export default function RootLayout() {
           presentation: 'card',
         }}
       />
+      <Stack.Screen
+        name="vin-scanner"
+        options={{
+          title: 'VIN Scanner',
+          presentation: 'card',
+        }}
+      />
     </Stack>
   );
 }

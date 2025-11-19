@@ -55,6 +55,19 @@ export default function HomeScreen() {
             </View>
           </View>
         </Link>
+
+        <Link href="/vin-scanner" style={styles.card}>
+          <View style={styles.cardContent}>
+            <Text style={styles.cardIcon}>🚗</Text>
+            <View style={styles.cardText}>
+              <Text style={styles.cardTitle}>VIN Scanner</Text>
+              <Text style={styles.cardDescription}>
+                Combined barcode & OCR VIN identification with confirmation
+              </Text>
+              <Text style={styles.cardPlatform}>Android • iOS</Text>
+            </View>
+          </View>
+        </Link>
       </View>
 
       <View style={styles.footer}>
