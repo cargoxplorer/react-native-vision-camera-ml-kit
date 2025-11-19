@@ -7,7 +7,7 @@
   "types": "lib/typescript/index.d.ts",
   "react-native": "src/index",
   "source": "src/index",
-  "private": true,
+  "private": false,
   "files": [
     "src",
     "lib",
@@ -50,14 +50,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/react-native-vision-camera-ml-kit.git"
+    "url": "git+https://github.com/cargoxplorer/react-native-vision-camera-ml-kit.git"
   },
   "author": "Your Name <your.email@example.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/yourusername/react-native-vision-camera-ml-kit/issues"
+    "url": "https://github.com/cargoxplorer/react-native-vision-camera-ml-kit/issues"
   },
-  "homepage": "https://github.com/yourusername/react-native-vision-camera-ml-kit#readme",
+  "homepage": "https://github.com/cargoxplorer/react-native-vision-camera-ml-kit#readme",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },

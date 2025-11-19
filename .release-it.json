@@ -1,0 +1,34 @@
+{
+  "git": {
+    "requireCleanWorkingDir": true,
+    "requireUpstream": false,
+    "requireCommits": false,
+    "addUntrackedFiles": false,
+    "commit": true,
+    "commitMessage": "chore: release v${version}",
+    "commitArgs": [],
+    "tag": true,
+    "tagName": "v${version}",
+    "tagAnnotation": "Release ${version}",
+    "push": true,
+    "pushArgs": ["--follow-tags"]
+  },
+  "npm": {
+    "publish": true,
+    "publishPath": ".",
+    "tag": "latest",
+    "otp": false
+  },
+  "github": {
+    "release": true,
+    "releaseName": "v${version}",
+    "releaseNotes": "echo 'See CHANGELOG.md for details'",
+    "preRelease": false,
+    "tokenRef": "GITHUB_TOKEN"
+  },
+  "hooks": {
+    "before:init": [],
+    "after:bump": "npm run prepare",
+    "after:release": "echo 'Successfully released ${name} v${version} to npm and GitHub'"
+  }
+}
