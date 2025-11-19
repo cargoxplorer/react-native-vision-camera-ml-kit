@@ -1,6 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Camera, useCameraDevice, useFrameProcessor } from 'react-native-vision-camera';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+} from 'react-native';
+import {
+  Camera,
+  useCameraDevice,
+  useFrameProcessor,
+  runAtTargetFps,
+} from 'react-native-vision-camera';
 import { Worklets } from 'react-native-worklets-core';
 import {
   useBarcodeScanner,
@@ -15,9 +26,13 @@ export default function BarcodeScannerScreen() {
   const [isActive, setIsActive] = useState(true);
 
   const device = useCameraDevice('back');
-  const { scanBarcode } = useBarcodeScanner({
-    formats: filterQROnly ? [BarcodeFormat.QR_CODE] : undefined,
-  });
+  const barcodeOptions = React.useMemo(
+    () => ({
+      formats: filterQROnly ? [BarcodeFormat.QR_CODE] : undefined,
+    }),
+    [filterQROnly]
+  );
+  const { scanBarcode } = useBarcodeScanner(barcodeOptions);
 
   React.useEffect(() => {
     (async () => {
@@ -27,16 +42,30 @@ export default function BarcodeScannerScreen() {
   }, []);
 
   const onBarcodesDetected = Worklets.createRunOnJS((detected: Barcode[]) => {
-    setBarcodes(detected);
+    // Avoid unnecessary re-renders when barcodes haven't changed
+    setBarcodes((prev) => {
+      if (prev.length === 0 && detected.length === 0) return prev;
+      if (
+        prev.length === detected.length &&
+        prev.every((b, i) => b.displayValue === detected[i]?.displayValue)
+      ) {
+        return prev;
+      }
+      return detected;
+    });
   });
 
   const frameProcessor = useFrameProcessor(
     (frame) => {
       'worklet';
-      const result = scanBarcode(frame);
-      if (result?.barcodes && result.barcodes.length > 0) {
-        onBarcodesDetected(result.barcodes);
-      }
+      // Throttle barcode scanning to avoid running on every frame
+      runAtTargetFps(3, () => {
+        'worklet';
+        const result = scanBarcode(frame);
+        if (result?.barcodes && result.barcodes.length > 0) {
+          onBarcodesDetected(result.barcodes);
+        }
+      });
     },
     [scanBarcode]
   );
@@ -85,7 +114,10 @@ export default function BarcodeScannerScreen() {
 
       <View style={styles.controls}>
         <TouchableOpacity
-          style={[styles.filterButton, filterQROnly && styles.filterButtonActive]}
+          style={[
+            styles.filterButton,
+            filterQROnly && styles.filterButtonActive,
+          ]}
           onPress={() => setFilterQROnly(!filterQROnly)}
         >
           <Text
@@ -105,14 +137,20 @@ export default function BarcodeScannerScreen() {
           {barcodes.length > 0 ? (
             barcodes.map((barcode, index) => (
               <View key={index} style={styles.barcodeCard}>
-                <Text style={styles.barcodeFormat}>{barcode.format.toUpperCase()}</Text>
+                <Text style={styles.barcodeFormat}>
+                  {barcode.format.toUpperCase()}
+                </Text>
                 <Text style={styles.barcodeValue}>{barcode.displayValue}</Text>
-                <Text style={styles.barcodeType}>Type: {barcode.valueType}</Text>
+                <Text style={styles.barcodeType}>
+                  Type: {barcode.valueType}
+                </Text>
 
                 {barcode.wifi && (
                   <View style={styles.structuredData}>
                     <Text style={styles.structuredDataTitle}>WiFi:</Text>
-                    <Text style={styles.structuredDataText}>SSID: {barcode.wifi.ssid}</Text>
+                    <Text style={styles.structuredDataText}>
+                      SSID: {barcode.wifi.ssid}
+                    </Text>
                     <Text style={styles.structuredDataText}>
                       Security: {barcode.wifi.encryptionType}
                     </Text>
@@ -129,12 +167,15 @@ export default function BarcodeScannerScreen() {
                 {barcode.contact && (
                   <View style={styles.structuredData}>
                     <Text style={styles.structuredDataTitle}>Contact:</Text>
-                    <Text style={styles.structuredDataText}>Name: {barcode.contact.name}</Text>
-                    {barcode.contact.phones && barcode.contact.phones.length > 0 && (
-                      <Text style={styles.structuredDataText}>
-                        Phone: {barcode.contact.phones[0]}
-                      </Text>
-                    )}
+                    <Text style={styles.structuredDataText}>
+                      Name: {barcode.contact.name}
+                    </Text>
+                    {barcode.contact.phones &&
+                      barcode.contact.phones.length > 0 && (
+                        <Text style={styles.structuredDataText}>
+                          Phone: {barcode.contact.phones[0]}
+                        </Text>
+                      )}
                   </View>
                 )}
               </View>

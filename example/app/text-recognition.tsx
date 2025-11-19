@@ -1,6 +1,17 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Camera, useCameraDevice, useFrameProcessor } from 'react-native-vision-camera';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+} from 'react-native';
+import {
+  Camera,
+  useCameraDevice,
+  useFrameProcessor,
+  runAtTargetFps,
+} from 'react-native-vision-camera';
 import { Worklets } from 'react-native-worklets-core';
 import {
   useTextRecognition,
@@ -17,7 +28,9 @@ export default function TextRecognitionScreen() {
   const [isActive, setIsActive] = useState(true);
 
   const device = useCameraDevice('back');
-  const { scanText } = useTextRecognition({ language });
+  // Memoize options so the plugin isn't recreated on every render
+  const textOptions = React.useMemo(() => ({ language }), [language]);
+  const { scanText } = useTextRecognition(textOptions);
 
   React.useEffect(() => {
     (async () => {
@@ -28,15 +41,24 @@ export default function TextRecognitionScreen() {
 
   const onTextDetected = Worklets.createRunOnJS(
     (textResult: TextRecognitionResult | null) => {
-      setResult(textResult);
+      // Avoid unnecessary React re-renders when text hasn't changed
+      setResult((prev) => {
+        if (!prev && !textResult) return prev;
+        if (prev?.text === textResult?.text) return prev;
+        return textResult;
+      });
     }
   );
 
   const frameProcessor = useFrameProcessor(
     (frame) => {
       'worklet';
-      const textResult = scanText(frame);
-      onTextDetected(textResult);
+      // Throttle OCR to avoid running on every single frame
+      runAtTargetFps(1, () => {
+        'worklet';
+        const textResult = scanText(frame);
+        onTextDetected(textResult);
+      });
     },
     [scanText]
   );
@@ -73,6 +95,8 @@ export default function TextRecognitionScreen() {
           device={device}
           isActive={isActive}
           frameProcessor={frameProcessor}
+          // Limit how often the frame processor runs to reduce OCR load
+          frameProcessorFps={5}
           pixelFormat="yuv"
         />
 
@@ -117,7 +141,9 @@ export default function TextRecognitionScreen() {
             <>
               <Text style={styles.resultText}>{result.text}</Text>
               <Text style={styles.resultsMeta}>
-                {result.blocks.length} blocks, {result.blocks.reduce((sum, b) => sum + b.lines.length, 0)} lines
+                {result.blocks.length} blocks,{' '}
+                {result.blocks.reduce((sum, b) => sum + b.lines.length, 0)}{' '}
+                lines
               </Text>
             </>
           ) : (

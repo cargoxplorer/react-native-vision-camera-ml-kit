@@ -87,34 +87,12 @@ export function createDocumentScannerPlugin(
      */
     scanDocument: (frame: Frame): DocumentScanningResult | null => {
       'worklet';
-
-      const frameStartTime = performance.now();
-
       try {
         const result = plugin.call(frame) as unknown as DocumentScanningResult | null;
-
-        const processingTime = performance.now() - frameStartTime;
-        Logger.performance('Document scanning frame processing', processingTime);
-
-        if (result && result.pages && result.pages.length > 0) {
-          Logger.debug(
-            `Document scanned: ${result.pageCount} page(s)`
-          );
-          result.pages.forEach((page) => {
-            Logger.debug(
-              `  Page ${page.pageNumber}: ${page.uri}`
-            );
-          });
-        }
-
         return result;
-      } catch (error) {
-        const processingTime = performance.now() - frameStartTime;
-        Logger.error('Error during document scanning', error);
-        Logger.performance(
-          'Document scanning frame processing (error)',
-          processingTime
-        );
+      } catch (e) {
+        // If the native plugin throws, return null instead of propagating
+        // an error from the worklet context.
         return null;
       }
     },

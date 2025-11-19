@@ -82,36 +82,12 @@ export function createBarcodeScannerPlugin(
      */
     scanBarcode: (frame: Frame): BarcodeScanningResult | null => {
       'worklet';
-
-      const frameStartTime = performance.now();
-
       try {
         const result = plugin.call(frame) as unknown as BarcodeScanningResult | null;
-
-        const processingTime = performance.now() - frameStartTime;
-        Logger.performance('Barcode scanning frame processing', processingTime);
-
-        if (result && result.barcodes && result.barcodes.length > 0) {
-          Logger.debug(
-            `Barcodes detected: ${result.barcodes.length} barcode(s)`
-          );
-          result.barcodes.forEach((barcode, index) => {
-            Logger.debug(
-              `  [${index + 1}] ${barcode.format}: ${barcode.displayValue.substring(0, 50)}${
-                barcode.displayValue.length > 50 ? '...' : ''
-              }`
-            );
-          });
-        }
-
         return result;
-      } catch (error) {
-        const processingTime = performance.now() - frameStartTime;
-        Logger.error('Error during barcode scanning', error);
-        Logger.performance(
-          'Barcode scanning frame processing (error)',
-          processingTime
-        );
+      } catch (e) {
+        // If the native plugin throws, return null instead of propagating
+        // an error from the worklet context.
         return null;
       }
     },
