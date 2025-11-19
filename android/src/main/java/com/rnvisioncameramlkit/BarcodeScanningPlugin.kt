@@ -30,8 +30,6 @@ class BarcodeScanningPlugin(
 
     private var scanner: BarcodeScanner
     private var detectInvertedBarcodes: Boolean = false
-    private var frameSkipInterval: Int = 1  // Process every frame by default (0 = skip none)
-    private var frameCounter: Int = 0
     private var tryRotations: Boolean = true  // Try 90 degree rotation if no barcodes found (default: enabled)
     // Reusable buffers to avoid per-frame allocations during inversion
     // Note: Only Y buffer needed since we use grayscale (not YUV→RGB)
@@ -50,13 +48,6 @@ class BarcodeScanningPlugin(
         detectInvertedBarcodes = options?.get("detectInvertedBarcodes") as? Boolean ?: false
         if (detectInvertedBarcodes) {
             Logger.warn("⚠️ Inverted barcode detection ENABLED - adds 30-40ms per frame when no barcodes found. Only enable if you specifically need white-on-black barcodes.")
-        }
-
-        // Frame skipping: process every Nth frame (default: every frame)
-        // Set skipFrames=1 to process every 2nd frame, skipFrames=2 for every 3rd, etc.
-        frameSkipInterval = (options?.get("skipFrames") as? Number)?.toInt() ?: 1
-        if (frameSkipInterval > 1) {
-            Logger.info("Frame skipping enabled: processing 1 in $frameSkipInterval frames (~${(frameSkipInterval - 1) * 16}ms reduction)")
         }
 
         // 90 degree rotation attempts: try both current rotation and 90 degrees (default: enabled)
@@ -128,14 +119,6 @@ class BarcodeScanningPlugin(
         val startTime = System.currentTimeMillis()
 
         try {
-            // Skip frames for performance optimization
-            if (frameSkipInterval > 1) {
-                frameCounter++
-                if (frameCounter % frameSkipInterval != 0) {
-                    return null  // Skip this frame
-                }
-            }
-
             val mediaImage: Image = frame.image
             val baseRotation = frame.imageProxy.imageInfo.rotationDegrees
 
