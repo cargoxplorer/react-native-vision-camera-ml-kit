@@ -8,8 +8,9 @@
 #import "BarcodeScanningPlugin.h"
 #import "react-native-vision-camera-ml-kit-Swift.h"
 
-// Use @import for VisionCamera
-@import VisionCamera;
+#import <VisionCamera/Frame.h>
+#import <VisionCamera/FrameProcessorPlugin.h>
+#import <VisionCamera/FrameProcessorPluginRegistry.h>
 
 @implementation RNVisionCameraMLKitPackage
 

@@ -8,14 +8,13 @@
 #import <React/RCTUtils.h>
 #import "react-native-vision-camera-ml-kit-Swift.h"
 
-// Use @import for MLKit modules (requires modules to be enabled)
-@import MLKitTextRecognition;
-@import MLKitTextRecognitionChinese;
-@import MLKitTextRecognitionDevanagari;
-@import MLKitTextRecognitionJapanese;
-@import MLKitTextRecognitionKorean;
-@import MLKitVision;
-@import Photos;
+#import <MLKitTextRecognition/MLKitTextRecognition.h>
+#import <MLKitTextRecognitionChinese/MLKitTextRecognitionChinese.h>
+#import <MLKitTextRecognitionDevanagari/MLKitTextRecognitionDevanagari.h>
+#import <MLKitTextRecognitionJapanese/MLKitTextRecognitionJapanese.h>
+#import <MLKitTextRecognitionKorean/MLKitTextRecognitionKorean.h>
+#import <MLKitVision/MLKitVision.h>
+#import <Photos/Photos.h>
 
 @implementation StaticTextRecognitionModule
 
@@ -144,7 +143,6 @@ RCT_EXPORT_METHOD(recognizeText:(NSDictionary *)options
         }
     } else if ([uri hasPrefix:@"assets-library://"]) {
         // Asset library URI (deprecated but still supported)
-        NSURL *url = [NSURL URLWithString:uri];
         completion(nil, [NSError errorWithDomain:@"ImageLoadError" code:4 userInfo:@{NSLocalizedDescriptionKey: @"assets-library:// URIs are deprecated"}]);
     } else {
         // Try as file path
