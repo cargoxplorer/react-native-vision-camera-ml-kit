@@ -1,0 +1,41 @@
+require "json"
+
+package = JSON.parse(File.read(File.join(__dir__, "package.json")))
+folly_compiler_flags = '-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 -Wno-comma -Wno-shorten-64-to-32'
+
+Pod::Spec.new do |s|
+  s.name         = "react-native-vision-camera-ml-kit"
+  s.version      = package["version"]
+  s.summary      = package["description"]
+  s.homepage     = package["homepage"]
+  s.license      = package["license"]
+  s.authors      = package["author"]
+
+  s.platforms    = { :ios => "16.0" }
+  s.source       = { :git => package["repository"]["url"], :tag => "#{s.version}" }
+
+  s.source_files = "ios/**/*.{h,m,mm,swift}"
+  s.public_header_files = "ios/**/*.h"
+
+  # Swift support
+  s.swift_version = '5.0'
+
+  # React Native dependencies
+  s.dependency "React-Core"
+
+  # Vision Camera dependencies
+  s.dependency "react-native-vision-camera"
+  s.dependency "react-native-worklets"
+
+  # Google ML Kit dependencies
+  s.dependency "GoogleMLKit/TextRecognition", '>= 8.0.0'
+  s.dependency "GoogleMLKit/BarcodeScanning", '>= 7.0.0'
+
+  # Compiler flags for C++ interop
+  s.compiler_flags = folly_compiler_flags + ' -DRCT_NEW_ARCH_ENABLED=0'
+  s.pod_target_xcconfig = {
+    'DEFINES_MODULE' => 'YES',
+    'SWIFT_OBJC_INTERFACE_HEADER_NAME' => 'react-native-vision-camera-ml-kit-Swift.h',
+    'SWIFT_VERSION' => '5.0'
+  }
+end
