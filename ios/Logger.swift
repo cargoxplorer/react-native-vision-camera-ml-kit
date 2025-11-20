@@ -10,7 +10,7 @@ import Foundation
 import os.log
 
 @objc public class Logger: NSObject {
-    private static let TAG = "RNVisionCameraMLKit"
+    public static let TAG = "RNVisionCameraMLKit"
 
     @objc public enum LogLevel: Int {
         case debug = 0
