@@ -5,7 +5,10 @@
 
 import { useBarcodeScanner } from '../barcodeScanning';
 import { BarcodeFormat } from '../types';
-import { mockVisionCameraProxy, mockPlugin } from './__mocks__/VisionCameraProxy';
+import {
+  mockVisionCameraProxy,
+  mockPlugin,
+} from './__mocks__/VisionCameraProxy';
 
 // Create a mock state tracker for useMemo
 const mockMemoState = {
@@ -70,14 +73,14 @@ describe('useBarcodeScanner', () => {
     const options = { formats: [BarcodeFormat.QR_CODE] };
 
     const result1 = useBarcodeScanner(options);
-    expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledTimes(
-      1
-    );
+    expect(
+      mockVisionCameraProxy.initFrameProcessorPlugin
+    ).toHaveBeenCalledTimes(1);
 
     const result2 = useBarcodeScanner(options);
-    expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledTimes(
-      1
-    );
+    expect(
+      mockVisionCameraProxy.initFrameProcessorPlugin
+    ).toHaveBeenCalledTimes(1);
 
     expect(result1).toBe(result2);
   });
@@ -87,17 +90,17 @@ describe('useBarcodeScanner', () => {
     const options2 = { formats: [BarcodeFormat.EAN_13] };
 
     useBarcodeScanner(options1);
-    expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledTimes(
-      1
-    );
+    expect(
+      mockVisionCameraProxy.initFrameProcessorPlugin
+    ).toHaveBeenCalledTimes(1);
 
     // Reset memoization
     mockMemoState.mockLastDeps = [];
 
     useBarcodeScanner(options2);
-    expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledTimes(
-      2
-    );
+    expect(
+      mockVisionCameraProxy.initFrameProcessorPlugin
+    ).toHaveBeenCalledTimes(2);
   });
 
   it('should recreate plugin when detectInvertedBarcodes changes', () => {
@@ -105,16 +108,16 @@ describe('useBarcodeScanner', () => {
     const options2 = { detectInvertedBarcodes: true };
 
     useBarcodeScanner(options1);
-    expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledTimes(
-      1
-    );
+    expect(
+      mockVisionCameraProxy.initFrameProcessorPlugin
+    ).toHaveBeenCalledTimes(1);
 
     // Reset memoization
     mockMemoState.mockLastDeps = [];
 
     useBarcodeScanner(options2);
-    expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledTimes(
-      2
-    );
+    expect(
+      mockVisionCameraProxy.initFrameProcessorPlugin
+    ).toHaveBeenCalledTimes(2);
   });
 });

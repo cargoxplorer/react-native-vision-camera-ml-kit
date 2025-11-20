@@ -5,7 +5,10 @@
 
 import { createTextRecognitionPlugin } from '../textRecognition';
 import { TextRecognitionScript } from '../types';
-import { mockVisionCameraProxy, mockPlugin } from './__mocks__/VisionCameraProxy';
+import {
+  mockVisionCameraProxy,
+  mockPlugin,
+} from './__mocks__/VisionCameraProxy';
 
 describe('createTextRecognitionPlugin', () => {
   beforeEach(() => {
@@ -17,10 +20,9 @@ describe('createTextRecognitionPlugin', () => {
     it('should create plugin with default options', () => {
       const plugin = createTextRecognitionPlugin();
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanTextV2',
-        {}
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanTextV2', {});
       expect(plugin).toBeDefined();
       expect(plugin.scanText).toBeDefined();
     });
@@ -30,20 +32,18 @@ describe('createTextRecognitionPlugin', () => {
         language: TextRecognitionScript.LATIN,
       });
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanTextV2',
-        { language: 'latin' }
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanTextV2', { language: 'latin' });
       expect(plugin).toBeDefined();
     });
 
     it('should create plugin with Chinese script option', () => {
       createTextRecognitionPlugin({ language: TextRecognitionScript.CHINESE });
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanTextV2',
-        { language: 'chinese' }
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanTextV2', { language: 'chinese' });
     });
 
     it('should create plugin with Devanagari script option', () => {
@@ -51,10 +51,9 @@ describe('createTextRecognitionPlugin', () => {
         language: TextRecognitionScript.DEVANAGARI,
       });
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanTextV2',
-        { language: 'devanagari' }
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanTextV2', { language: 'devanagari' });
     });
 
     it('should create plugin with Japanese script option', () => {
@@ -62,34 +61,33 @@ describe('createTextRecognitionPlugin', () => {
         language: TextRecognitionScript.JAPANESE,
       });
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanTextV2',
-        { language: 'japanese' }
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanTextV2', { language: 'japanese' });
     });
 
     it('should create plugin with Korean script option', () => {
       createTextRecognitionPlugin({ language: TextRecognitionScript.KOREAN });
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanTextV2',
-        { language: 'korean' }
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanTextV2', { language: 'korean' });
     });
 
     it('should accept custom language string', () => {
       createTextRecognitionPlugin({ language: 'custom-lang' });
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanTextV2',
-        { language: 'custom-lang' }
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanTextV2', { language: 'custom-lang' });
     });
   });
 
   describe('error handling', () => {
     it('should throw error when plugin initialization fails', () => {
-      mockVisionCameraProxy.initFrameProcessorPlugin.mockReturnValue(null as any);
+      mockVisionCameraProxy.initFrameProcessorPlugin.mockReturnValue(
+        null as any
+      );
 
       expect(() => createTextRecognitionPlugin()).toThrow(
         "Failed to initialize Text Recognition plugin. Make sure 'react-native-vision-camera-ml-kit' is properly installed and linked."
@@ -97,7 +95,9 @@ describe('createTextRecognitionPlugin', () => {
     });
 
     it('should throw error when plugin is undefined', () => {
-      mockVisionCameraProxy.initFrameProcessorPlugin.mockReturnValue(undefined as any);
+      mockVisionCameraProxy.initFrameProcessorPlugin.mockReturnValue(
+        undefined as any
+      );
 
       expect(() => createTextRecognitionPlugin()).toThrow();
     });

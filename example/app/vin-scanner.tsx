@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -419,7 +419,8 @@ export default function VINScannerScreen() {
                             styles.progressFill,
                             {
                               width: `${Math.min(
-                                (match.count / BARCODE_CONFIRMATION_THRESHOLD) * 100,
+                                (match.count / BARCODE_CONFIRMATION_THRESHOLD) *
+                                  100,
                                 100
                               )}%`,
                             },

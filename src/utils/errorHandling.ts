@@ -87,10 +87,7 @@ export function handleError(
     return mlkitError;
   }
 
-  const mlkitError = createError(
-    fallbackCode,
-    `${context}: ${String(error)}`
-  );
+  const mlkitError = createError(fallbackCode, `${context}: ${String(error)}`);
   return mlkitError;
 }
 
@@ -102,10 +99,7 @@ export function validateRequired(
   paramName: string
 ): asserts value {
   if (value === null || value === undefined) {
-    throw createError(
-      ErrorCode.INVALID_ARGUMENT,
-      `${paramName} is required`
-    );
+    throw createError(ErrorCode.INVALID_ARGUMENT, `${paramName} is required`);
   }
 }
 
@@ -114,11 +108,20 @@ export function validateRequired(
  */
 export function validateUri(uri: string): void {
   if (!uri || typeof uri !== 'string') {
-    throw createError(ErrorCode.INVALID_ARGUMENT, 'URI must be a non-empty string');
+    throw createError(
+      ErrorCode.INVALID_ARGUMENT,
+      'URI must be a non-empty string'
+    );
   }
 
-  if (!uri.startsWith('file://') && !uri.startsWith('content://') && !uri.startsWith('/')) {
-    Logger.warn(`URI may be invalid: ${uri}. Expected file://, content://, or absolute path.`);
+  if (
+    !uri.startsWith('file://') &&
+    !uri.startsWith('content://') &&
+    !uri.startsWith('/')
+  ) {
+    Logger.warn(
+      `URI may be invalid: ${uri}. Expected file://, content://, or absolute path.`
+    );
   }
 }
 

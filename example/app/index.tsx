@@ -50,7 +50,9 @@ export default function HomeScreen() {
                 Professional document digitization with ML cleaning
               </Text>
               <Text style={styles.cardPlatform}>
-                {Platform.OS === 'android' ? 'Android Only ✓' : 'Android Only ✗'}
+                {Platform.OS === 'android'
+                  ? 'Android Only ✓'
+                  : 'Android Only ✗'}
               </Text>
             </View>
           </View>

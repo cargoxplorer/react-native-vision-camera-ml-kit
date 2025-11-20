@@ -5,7 +5,10 @@
 
 import { createBarcodeScannerPlugin } from '../barcodeScanning';
 import { BarcodeFormat } from '../types';
-import { mockVisionCameraProxy, mockPlugin } from './__mocks__/VisionCameraProxy';
+import {
+  mockVisionCameraProxy,
+  mockPlugin,
+} from './__mocks__/VisionCameraProxy';
 
 describe('createBarcodeScannerPlugin', () => {
   beforeEach(() => {
@@ -17,10 +20,9 @@ describe('createBarcodeScannerPlugin', () => {
     it('should create plugin with default options', () => {
       const plugin = createBarcodeScannerPlugin();
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanBarcode',
-        {}
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanBarcode', {});
       expect(plugin).toBeDefined();
       expect(plugin.scanBarcode).toBeDefined();
     });
@@ -28,10 +30,9 @@ describe('createBarcodeScannerPlugin', () => {
     it('should create plugin with no format restrictions', () => {
       const plugin = createBarcodeScannerPlugin();
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanBarcode',
-        {}
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanBarcode', {});
       expect(plugin).toBeDefined();
     });
 
@@ -40,10 +41,9 @@ describe('createBarcodeScannerPlugin', () => {
         formats: [BarcodeFormat.QR_CODE, BarcodeFormat.EAN_13],
       });
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanBarcode',
-        { formats: ['qrcode', 'ean13'] }
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanBarcode', { formats: ['qrcode', 'ean13'] });
     });
 
     it('should create plugin with single format', () => {
@@ -51,10 +51,9 @@ describe('createBarcodeScannerPlugin', () => {
         formats: [BarcodeFormat.QR_CODE],
       });
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanBarcode',
-        { formats: ['qrcode'] }
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanBarcode', { formats: ['qrcode'] });
     });
 
     it('should create plugin with all 1D formats', () => {
@@ -72,22 +71,21 @@ describe('createBarcodeScannerPlugin', () => {
 
       createBarcodeScannerPlugin({ formats });
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanBarcode',
-        {
-          formats: [
-            'codabar',
-            'code39',
-            'code93',
-            'code128',
-            'ean8',
-            'ean13',
-            'itf',
-            'upca',
-            'upce',
-          ],
-        }
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanBarcode', {
+        formats: [
+          'codabar',
+          'code39',
+          'code93',
+          'code128',
+          'ean8',
+          'ean13',
+          'itf',
+          'upca',
+          'upce',
+        ],
+      });
     });
 
     it('should create plugin with all 2D formats', () => {
@@ -100,16 +98,19 @@ describe('createBarcodeScannerPlugin', () => {
 
       createBarcodeScannerPlugin({ formats });
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanBarcode',
-        { formats: ['aztec', 'datamatrix', 'pdf417', 'qrcode'] }
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanBarcode', {
+        formats: ['aztec', 'datamatrix', 'pdf417', 'qrcode'],
+      });
     });
   });
 
   describe('error handling', () => {
     it('should throw error when plugin initialization fails', () => {
-      mockVisionCameraProxy.initFrameProcessorPlugin.mockReturnValue(null as any);
+      mockVisionCameraProxy.initFrameProcessorPlugin.mockReturnValue(
+        null as any
+      );
 
       expect(() => createBarcodeScannerPlugin()).toThrow(
         "Failed to initialize Barcode Scanner plugin. Make sure 'react-native-vision-camera-ml-kit' is properly installed and linked."
@@ -117,7 +118,9 @@ describe('createBarcodeScannerPlugin', () => {
     });
 
     it('should throw error when plugin is undefined', () => {
-      mockVisionCameraProxy.initFrameProcessorPlugin.mockReturnValue(undefined as any);
+      mockVisionCameraProxy.initFrameProcessorPlugin.mockReturnValue(
+        undefined as any
+      );
 
       expect(() => createBarcodeScannerPlugin()).toThrow();
     });
@@ -305,10 +308,9 @@ describe('createBarcodeScannerPlugin', () => {
         detectInvertedBarcodes: true,
       });
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanBarcode',
-        { detectInvertedBarcodes: true }
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanBarcode', { detectInvertedBarcodes: true });
     });
 
     it('should handle detectInvertedBarcodes with formats', () => {
@@ -317,19 +319,20 @@ describe('createBarcodeScannerPlugin', () => {
         detectInvertedBarcodes: true,
       });
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanBarcode',
-        { formats: ['qrcode'], detectInvertedBarcodes: true }
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanBarcode', {
+        formats: ['qrcode'],
+        detectInvertedBarcodes: true,
+      });
     });
 
     it('should default detectInvertedBarcodes to false', () => {
       createBarcodeScannerPlugin();
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanBarcode',
-        {}
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanBarcode', {});
     });
 
     it('should detect inverted barcode results', () => {

@@ -5,7 +5,10 @@
 
 import { createDocumentScannerPlugin } from '../documentScanner';
 import { DocumentScannerMode } from '../types';
-import { mockVisionCameraProxy, mockPlugin } from './__mocks__/VisionCameraProxy';
+import {
+  mockVisionCameraProxy,
+  mockPlugin,
+} from './__mocks__/VisionCameraProxy';
 
 describe('createDocumentScannerPlugin', () => {
   beforeEach(() => {
@@ -17,10 +20,9 @@ describe('createDocumentScannerPlugin', () => {
     it('should create plugin with default options', () => {
       const plugin = createDocumentScannerPlugin();
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanDocument',
-        {}
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanDocument', {});
       expect(plugin).toBeDefined();
       expect(plugin.scanDocument).toBeDefined();
     });
@@ -30,10 +32,9 @@ describe('createDocumentScannerPlugin', () => {
         mode: DocumentScannerMode.BASE,
       });
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanDocument',
-        { mode: 'base' }
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanDocument', { mode: 'base' });
     });
 
     it('should create plugin with BASE_WITH_FILTER mode', () => {
@@ -41,10 +42,9 @@ describe('createDocumentScannerPlugin', () => {
         mode: DocumentScannerMode.BASE_WITH_FILTER,
       });
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanDocument',
-        { mode: 'baseWithFilter' }
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanDocument', { mode: 'baseWithFilter' });
     });
 
     it('should create plugin with FULL mode', () => {
@@ -52,10 +52,9 @@ describe('createDocumentScannerPlugin', () => {
         mode: DocumentScannerMode.FULL,
       });
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanDocument',
-        { mode: 'full' }
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanDocument', { mode: 'full' });
     });
 
     it('should create plugin with page limit', () => {
@@ -63,10 +62,9 @@ describe('createDocumentScannerPlugin', () => {
         pageLimit: 5,
       });
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanDocument',
-        { pageLimit: 5 }
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanDocument', { pageLimit: 5 });
     });
 
     it('should create plugin with gallery import disabled', () => {
@@ -74,10 +72,9 @@ describe('createDocumentScannerPlugin', () => {
         galleryImportEnabled: false,
       });
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanDocument',
-        { galleryImportEnabled: false }
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanDocument', { galleryImportEnabled: false });
     });
 
     it('should create plugin with all options', () => {
@@ -87,20 +84,21 @@ describe('createDocumentScannerPlugin', () => {
         galleryImportEnabled: true,
       });
 
-      expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledWith(
-        'scanDocument',
-        {
-          mode: 'full',
-          pageLimit: 10,
-          galleryImportEnabled: true,
-        }
-      );
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanDocument', {
+        mode: 'full',
+        pageLimit: 10,
+        galleryImportEnabled: true,
+      });
     });
   });
 
   describe('error handling', () => {
     it('should throw error when plugin initialization fails', () => {
-      mockVisionCameraProxy.initFrameProcessorPlugin.mockReturnValue(null as any);
+      mockVisionCameraProxy.initFrameProcessorPlugin.mockReturnValue(
+        null as any
+      );
 
       expect(() => createDocumentScannerPlugin()).toThrow(
         "Failed to initialize Document Scanner plugin. Make sure 'react-native-vision-camera-ml-kit' is properly installed and linked."
@@ -108,7 +106,9 @@ describe('createDocumentScannerPlugin', () => {
     });
 
     it('should throw error when plugin is undefined', () => {
-      mockVisionCameraProxy.initFrameProcessorPlugin.mockReturnValue(undefined as any);
+      mockVisionCameraProxy.initFrameProcessorPlugin.mockReturnValue(
+        undefined as any
+      );
 
       expect(() => createDocumentScannerPlugin()).toThrow();
     });
@@ -247,8 +247,14 @@ describe('createDocumentScannerPlugin', () => {
 
       const result = plugin.scanDocument(mockFrame);
 
-      expect(result?.pages[0].originalSize).toEqual({ width: 3000, height: 4000 });
-      expect(result?.pages[0].processedSize).toEqual({ width: 2400, height: 3200 });
+      expect(result?.pages[0].originalSize).toEqual({
+        width: 3000,
+        height: 4000,
+      });
+      expect(result?.pages[0].processedSize).toEqual({
+        width: 2400,
+        height: 3200,
+      });
     });
   });
 });

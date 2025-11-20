@@ -5,7 +5,10 @@
 
 import { useTextRecognition } from '../textRecognition';
 import { TextRecognitionScript } from '../types';
-import { mockVisionCameraProxy, mockPlugin } from './__mocks__/VisionCameraProxy';
+import {
+  mockVisionCameraProxy,
+  mockPlugin,
+} from './__mocks__/VisionCameraProxy';
 
 // Create a mock state tracker for useMemo
 const mockMemoState = {
@@ -70,14 +73,14 @@ describe('useTextRecognition', () => {
     const options = { language: TextRecognitionScript.LATIN };
 
     const result1 = useTextRecognition(options);
-    expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledTimes(
-      1
-    );
+    expect(
+      mockVisionCameraProxy.initFrameProcessorPlugin
+    ).toHaveBeenCalledTimes(1);
 
     const result2 = useTextRecognition(options);
-    expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledTimes(
-      1
-    );
+    expect(
+      mockVisionCameraProxy.initFrameProcessorPlugin
+    ).toHaveBeenCalledTimes(1);
 
     expect(result1).toBe(result2);
   });
@@ -87,16 +90,16 @@ describe('useTextRecognition', () => {
     const options2 = { language: TextRecognitionScript.CHINESE };
 
     useTextRecognition(options1);
-    expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledTimes(
-      1
-    );
+    expect(
+      mockVisionCameraProxy.initFrameProcessorPlugin
+    ).toHaveBeenCalledTimes(1);
 
     // Reset memoization
     mockMemoState.mockLastDeps = [];
 
     useTextRecognition(options2);
-    expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledTimes(
-      2
-    );
+    expect(
+      mockVisionCameraProxy.initFrameProcessorPlugin
+    ).toHaveBeenCalledTimes(2);
   });
 });

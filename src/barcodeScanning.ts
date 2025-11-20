@@ -83,7 +83,9 @@ export function createBarcodeScannerPlugin(
     scanBarcode: (frame: Frame): BarcodeScanningResult | null => {
       'worklet';
       try {
-        const result = plugin.call(frame) as unknown as BarcodeScanningResult | null;
+        const result = plugin.call(
+          frame
+        ) as unknown as BarcodeScanningResult | null;
         return result;
       } catch (e) {
         // Log the error so developers can debug issues

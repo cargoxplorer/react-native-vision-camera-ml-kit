@@ -19,7 +19,9 @@ import { useAppLifecycle } from './utils/useAppLifecycle';
 
 export default function DocumentScannerScreen() {
   const [result, setResult] = useState<DocumentScanningResult | null>(null);
-  const [mode, setMode] = useState<DocumentScannerMode>(DocumentScannerMode.FULL);
+  const [mode, setMode] = useState<DocumentScannerMode>(
+    DocumentScannerMode.FULL
+  );
   const [isScanning, setIsScanning] = useState(false);
   const [isAppActive, setIsAppActive] = useState(true);
 
@@ -121,13 +123,18 @@ export default function DocumentScannerScreen() {
         <TouchableOpacity
           style={[
             styles.scanButton,
-            (isScanning || Platform.OS !== 'android' || !isAppActive) && styles.scanButtonDisabled,
+            (isScanning || Platform.OS !== 'android' || !isAppActive) &&
+              styles.scanButtonDisabled,
           ]}
           onPress={handleScan}
           disabled={isScanning || Platform.OS !== 'android' || !isAppActive}
         >
           <Text style={styles.scanButtonText}>
-            {!isAppActive ? 'App in Background' : isScanning ? 'Scanning...' : 'Scan Document'}
+            {!isAppActive
+              ? 'App in Background'
+              : isScanning
+                ? 'Scanning...'
+                : 'Scan Document'}
           </Text>
         </TouchableOpacity>
 
@@ -168,9 +175,7 @@ export default function DocumentScannerScreen() {
 
         {!result && (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>
-              No documents scanned yet
-            </Text>
+            <Text style={styles.emptyStateText}>No documents scanned yet</Text>
             <Text style={styles.emptyStateSubtext}>
               Use the "Scan Document" button above
             </Text>

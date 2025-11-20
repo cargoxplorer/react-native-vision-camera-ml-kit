@@ -5,7 +5,10 @@
 
 import { useDocumentScanner } from '../documentScanner';
 import { DocumentScannerMode } from '../types';
-import { mockVisionCameraProxy, mockPlugin } from './__mocks__/VisionCameraProxy';
+import {
+  mockVisionCameraProxy,
+  mockPlugin,
+} from './__mocks__/VisionCameraProxy';
 
 // Create a mock state tracker for useMemo
 const mockMemoState = {
@@ -70,14 +73,14 @@ describe('useDocumentScanner', () => {
     const options = { mode: DocumentScannerMode.BASE };
 
     const result1 = useDocumentScanner(options);
-    expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledTimes(
-      1
-    );
+    expect(
+      mockVisionCameraProxy.initFrameProcessorPlugin
+    ).toHaveBeenCalledTimes(1);
 
     const result2 = useDocumentScanner(options);
-    expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledTimes(
-      1
-    );
+    expect(
+      mockVisionCameraProxy.initFrameProcessorPlugin
+    ).toHaveBeenCalledTimes(1);
 
     expect(result1).toBe(result2);
   });
@@ -87,16 +90,16 @@ describe('useDocumentScanner', () => {
     const options2 = { mode: DocumentScannerMode.FULL };
 
     useDocumentScanner(options1);
-    expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledTimes(
-      1
-    );
+    expect(
+      mockVisionCameraProxy.initFrameProcessorPlugin
+    ).toHaveBeenCalledTimes(1);
 
     // Reset memoization
     mockMemoState.mockLastDeps = [];
 
     useDocumentScanner(options2);
-    expect(mockVisionCameraProxy.initFrameProcessorPlugin).toHaveBeenCalledTimes(
-      2
-    );
+    expect(
+      mockVisionCameraProxy.initFrameProcessorPlugin
+    ).toHaveBeenCalledTimes(2);
   });
 });

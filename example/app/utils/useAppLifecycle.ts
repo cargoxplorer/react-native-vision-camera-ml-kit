@@ -15,17 +15,6 @@ export function useAppLifecycle(
   onPause?: () => void,
   onResume?: () => void
 ) {
-  useEffect(() => {
-    const subscription = AppState.addEventListener(
-      'change',
-      handleAppStateChange
-    );
-
-    return () => {
-      subscription.remove();
-    };
-  }, []);
-
   const handleAppStateChange = (nextAppState: AppStateStatus) => {
     if (nextAppState === 'active') {
       // App is in foreground - resume camera processing
@@ -37,4 +26,16 @@ export function useAppLifecycle(
       onPause?.();
     }
   };
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener(
+      'change',
+      handleAppStateChange
+    );
+
+    return () => {
+      subscription.remove();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 }

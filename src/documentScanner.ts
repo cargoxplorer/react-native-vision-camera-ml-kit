@@ -88,7 +88,9 @@ export function createDocumentScannerPlugin(
     scanDocument: (frame: Frame): DocumentScanningResult | null => {
       'worklet';
       try {
-        const result = plugin.call(frame) as unknown as DocumentScanningResult | null;
+        const result = plugin.call(
+          frame
+        ) as unknown as DocumentScanningResult | null;
         return result;
       } catch (e) {
         // If the native plugin throws, return null instead of propagating
@@ -134,8 +136,5 @@ export function createDocumentScannerPlugin(
 export function useDocumentScanner(
   options?: DocumentScannerOptions
 ): DocumentScannerPlugin {
-  return useMemo(
-    () => createDocumentScannerPlugin(options),
-    [options]
-  );
+  return useMemo(() => createDocumentScannerPlugin(options), [options]);
 }

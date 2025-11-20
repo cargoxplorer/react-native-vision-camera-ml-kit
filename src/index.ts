@@ -16,7 +16,11 @@ export * from './types';
 
 // Export utilities
 export { Logger, LogLevel } from './utils/Logger';
-export { ErrorCode, MLKitError, isCancellationError } from './utils/errorHandling';
+export {
+  ErrorCode,
+  MLKitError,
+  isCancellationError,
+} from './utils/errorHandling';
 export { performanceMonitor } from './utils/performance';
 
 // Text Recognition v2

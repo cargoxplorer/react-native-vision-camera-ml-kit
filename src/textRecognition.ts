@@ -79,7 +79,9 @@ export function createTextRecognitionPlugin(
     scanText: (frame: Frame): TextRecognitionResult | null => {
       'worklet';
       try {
-        const result = plugin.call(frame) as unknown as TextRecognitionResult | null;
+        const result = plugin.call(
+          frame
+        ) as unknown as TextRecognitionResult | null;
         return result;
       } catch (e) {
         // If the native plugin throws, surface a graceful null result in the
@@ -120,8 +122,5 @@ export function createTextRecognitionPlugin(
 export function useTextRecognition(
   options?: TextRecognitionOptions
 ): TextRecognitionPlugin {
-  return useMemo(
-    () => createTextRecognitionPlugin(options),
-    [options]
-  );
+  return useMemo(() => createTextRecognitionPlugin(options), [options]);
 }

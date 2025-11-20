@@ -11,10 +11,7 @@
 
 import { NativeModules, Platform } from 'react-native';
 import { Logger } from './utils/Logger';
-import type {
-  DocumentScannerOptions,
-  DocumentScanningResult,
-} from './types';
+import type { DocumentScannerOptions, DocumentScanningResult } from './types';
 
 const LINKING_ERROR = `Failed to load DocumentScannerModule. Make sure 'react-native-vision-camera-ml-kit' is properly installed and linked.
 
@@ -112,9 +109,7 @@ export async function launchDocumentScanner(
     Logger.performance('Document scanner session', processingTime);
 
     if (result && result.pages && result.pages.length > 0) {
-      Logger.debug(
-        `Document scanner completed: ${result.pageCount} page(s)`
-      );
+      Logger.debug(`Document scanner completed: ${result.pageCount} page(s)`);
     } else {
       Logger.debug('Document scanner returned no pages (cancelled?)');
     }

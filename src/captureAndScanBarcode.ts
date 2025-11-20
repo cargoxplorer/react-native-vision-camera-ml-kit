@@ -9,10 +9,7 @@
 import type { Camera } from 'react-native-vision-camera';
 import { Logger } from './utils/Logger';
 import { scanBarcodeFromImage } from './staticBarcodeScanning';
-import type {
-  BarcodeScanningOptions,
-  BarcodeScanningResult,
-} from './types';
+import type { BarcodeScanningOptions, BarcodeScanningResult } from './types';
 
 /**
  * Options for capture and scan operation
