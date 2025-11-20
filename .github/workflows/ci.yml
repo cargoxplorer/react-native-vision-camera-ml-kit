@@ -128,7 +128,7 @@ jobs:
           if-no-files-found: error
 
   ios-build:
-    runs-on: macos-14 # macOS 14 (Sonoma) with Xcode 15+
+    runs-on: macos-15 # macOS 15 (Sequoia) with Xcode 16+
     name: iOS Native Build
 
     steps:
@@ -170,7 +170,7 @@ jobs:
             -scheme reactnativevisioncameramlkitexample \
             -configuration Debug \
             -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
