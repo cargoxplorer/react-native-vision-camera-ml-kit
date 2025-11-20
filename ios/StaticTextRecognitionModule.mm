@@ -8,6 +8,7 @@
 #import <React/RCTUtils.h>
 #import "react-native-vision-camera-ml-kit-Swift.h"
 
+// MLKit umbrella headers include all necessary types
 #import <MLKitTextRecognition/MLKitTextRecognition.h>
 #import <MLKitTextRecognitionChinese/MLKitTextRecognitionChinese.h>
 #import <MLKitTextRecognitionDevanagari/MLKitTextRecognitionDevanagari.h>
@@ -15,14 +16,6 @@
 #import <MLKitTextRecognitionKorean/MLKitTextRecognitionKorean.h>
 #import <MLKitVision/MLKitVision.h>
 #import <Photos/Photos.h>
-
-// Explicit imports for MLKit text types
-#import <MLKitTextRecognition/MLKText.h>
-#import <MLKitTextRecognition/MLKTextBlock.h>
-#import <MLKitTextRecognition/MLKTextLine.h>
-#import <MLKitTextRecognition/MLKTextElement.h>
-#import <MLKitTextRecognition/MLKTextSymbol.h>
-#import <MLKitTextRecognition/MLKTextRecognizedLanguage.h>
 
 @implementation StaticTextRecognitionModule
 
