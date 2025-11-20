@@ -29,6 +29,10 @@ Pod::Spec.new do |s|
 
   # Google ML Kit dependencies
   s.dependency "GoogleMLKit/TextRecognition", '>= 8.0.0'
+  s.dependency "GoogleMLKit/TextRecognitionChinese", '>= 8.0.0'
+  s.dependency "GoogleMLKit/TextRecognitionDevanagari", '>= 8.0.0'
+  s.dependency "GoogleMLKit/TextRecognitionJapanese", '>= 8.0.0'
+  s.dependency "GoogleMLKit/TextRecognitionKorean", '>= 8.0.0'
   s.dependency "GoogleMLKit/BarcodeScanning", '>= 7.0.0'
 
   # Compiler flags for C++ interop
