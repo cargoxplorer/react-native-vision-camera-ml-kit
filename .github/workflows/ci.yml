@@ -111,6 +111,9 @@ jobs:
           cd example
           yarn install
 
+      - name: Make gradlew executable
+        run: chmod +x example/android/gradlew
+
       - name: Build Android example app
         run: |
           cd example/android
