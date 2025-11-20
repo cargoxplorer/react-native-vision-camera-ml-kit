@@ -24,8 +24,8 @@ Pod::Spec.new do |s|
   s.dependency "React-Core"
 
   # Vision Camera dependencies
-  s.dependency "react-native-vision-camera"
-  s.dependency "react-native-worklets"
+  s.dependency "VisionCamera"
+  s.dependency "react-native-worklets-core"
 
   # Google ML Kit dependencies
   s.dependency "GoogleMLKit/TextRecognition", '>= 8.0.0'
