@@ -49,14 +49,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cargoxplorer/react-native-vision-camera-ml-kit.git"
+    "url": "git+https://github.com/cargoxplorer/react-native-vision-camera-mlkit-plugin.git"
   },
   "author": "Your Name <your.email@example.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/cargoxplorer/react-native-vision-camera-ml-kit/issues"
+    "url": "https://github.com/cargoxplorer/react-native-vision-camera-mlkit-plugin/issues"
   },
-  "homepage": "https://github.com/cargoxplorer/react-native-vision-camera-ml-kit#readme",
+  "homepage": "https://github.com/cargoxplorer/react-native-vision-camera-mlkit-plugin#readme",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
