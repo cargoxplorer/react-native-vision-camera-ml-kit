@@ -11,20 +11,6 @@
 #import <MLKitBarcodeScanning/MLKitBarcodeScanning.h>
 #import <MLKitVision/MLKitVision.h>
 
-// Forward declarations for MLKit barcode types
-@class MLKBarcode;
-@class MLKBarcodeAddress;
-@class MLKBarcodeContactInfo;
-@class MLKBarcodeDriverLicense;
-@class MLKBarcodeEmail;
-@class MLKBarcodeGeoPoint;
-@class MLKBarcodePersonName;
-@class MLKBarcodePhone;
-@class MLKBarcodeSMS;
-@class MLKBarcodeURLBookmark;
-@class MLKBarcodeWiFi;
-@class MLKBarcodeCalendarEvent;
-
 @interface BarcodeScanningPlugin ()
 @property (nonatomic, strong) MLKBarcodeScanner *scanner;
 @property (nonatomic, assign) BOOL detectInvertedBarcodes;
@@ -36,17 +22,17 @@
 - (instancetype)initWithProxy:(VisionCameraProxyHolder*)proxy
                   withOptions:(NSDictionary*)options {
     if (self = [super initWithProxy:proxy withOptions:options]) {
-        [Logger info:@"Initializing barcode scanner"];
+        [Logger infoWithMessage:@"Initializing barcode scanner"];
 
         // Extract options
         self.detectInvertedBarcodes = [options[@"detectInvertedBarcodes"] boolValue];
         if (self.detectInvertedBarcodes) {
-            [Logger warn:@"⚠️ Inverted barcode detection may not be fully supported on iOS. This feature may be Android-only."];
+            [Logger warnWithMessage:@"⚠️ Inverted barcode detection may not be fully supported on iOS. This feature may be Android-only."];
         }
 
         self.tryRotations = options[@"tryRotations"] ? [options[@"tryRotations"] boolValue] : YES;
         if (!self.tryRotations) {
-            [Logger info:@"90 degree rotation attempts DISABLED"];
+            [Logger infoWithMessage:@"90 degree rotation attempts DISABLED"];
         }
 
         // Parse formats
@@ -54,33 +40,33 @@
         MLKBarcodeScannerOptions *scannerOptions;
 
         if (formats && formats.count > 0) {
-            [Logger debug:[NSString stringWithFormat:@"Parsing %lu barcode format(s) from options", (unsigned long)formats.count]];
+            [Logger debugWithMessage:[NSString stringWithFormat:@"Parsing %lu barcode format(s) from options", (unsigned long)formats.count]];
 
             MLKBarcodeFormat combinedFormats = 0;
             for (NSString *formatString in formats) {
                 MLKBarcodeFormat parsedFormat = [self parseBarcodeFormat:formatString];
                 if (parsedFormat != 0) {
                     combinedFormats |= parsedFormat;
-                    [Logger debug:[NSString stringWithFormat:@"Successfully parsed format: '%@'", formatString]];
+                    [Logger debugWithMessage:[NSString stringWithFormat:@"Successfully parsed format: '%@'", formatString]];
                 } else {
-                    [Logger error:[NSString stringWithFormat:@"FAILED to parse barcode format: '%@'", formatString] error:nil];
+                    [Logger errorWithMessage:[NSString stringWithFormat:@"FAILED to parse barcode format: '%@'", formatString] error:nil];
                 }
             }
 
             if (combinedFormats == 0) {
-                [Logger error:@"No valid barcode formats could be parsed! Falling back to all formats" error:nil];
+                [Logger errorWithMessage:@"No valid barcode formats could be parsed! Falling back to all formats" error:nil];
                 scannerOptions = [[MLKBarcodeScannerOptions alloc] initWithFormats:MLKBarcodeFormatAll];
             } else {
-                [Logger info:[NSString stringWithFormat:@"Scanning barcode format(s) with combined mask: %lu", (unsigned long)combinedFormats]];
+                [Logger infoWithMessage:[NSString stringWithFormat:@"Scanning barcode format(s) with combined mask: %lu", (unsigned long)combinedFormats]];
                 scannerOptions = [[MLKBarcodeScannerOptions alloc] initWithFormats:combinedFormats];
             }
         } else {
-            [Logger info:@"No format filter specified, scanning all barcode formats"];
+            [Logger infoWithMessage:@"No format filter specified, scanning all barcode formats"];
             scannerOptions = [[MLKBarcodeScannerOptions alloc] initWithFormats:MLKBarcodeFormatAll];
         }
 
         self.scanner = [MLKBarcodeScanner barcodeScannerWithOptions:scannerOptions];
-        [Logger info:@"Barcode scanner initialized successfully"];
+        [Logger infoWithMessage:@"Barcode scanner initialized successfully"];
     }
     return self;
 }
@@ -93,7 +79,7 @@
         UIImageOrientation orientation = [self getOrientation:frame.orientation];
 
         if ([Logger isDebugEnabled]) {
-            [Logger debug:[NSString stringWithFormat:@"Processing frame: %dx%d, orientation: %ld",
+            [Logger debugWithMessage:[NSString stringWithFormat:@"Processing frame: %dx%d, orientation: %ld",
                           (int)frame.width, (int)frame.height, (long)orientation]];
         }
 
@@ -105,22 +91,22 @@
         NSArray<MLKBarcode *> *barcodes = [self.scanner resultsInImage:visionImage error:&error];
 
         NSTimeInterval processingTime = [[NSDate date] timeIntervalSinceDate:startTime] * 1000;
-        [Logger performance:@"Barcode scanning processing" durationMs:(int64_t)processingTime];
+        [Logger performanceWithMessage:@"Barcode scanning processing" durationMs:(int64_t)processingTime];
 
         if (error != nil) {
-            [Logger error:@"Error during barcode scanning" error:error];
+            [Logger errorWithMessage:@"Error during barcode scanning" error:error];
             return nil;
         }
 
         if (!barcodes || barcodes.count == 0) {
             if ([Logger isDebugEnabled]) {
-                [Logger debug:@"No barcodes detected in frame"];
+                [Logger debugWithMessage:@"No barcodes detected in frame"];
             }
             return nil;
         }
 
         if ([Logger isDebugEnabled]) {
-            [Logger debug:[NSString stringWithFormat:@"Barcodes detected: %lu barcode(s)", (unsigned long)barcodes.count]];
+            [Logger debugWithMessage:[NSString stringWithFormat:@"Barcodes detected: %lu barcode(s)", (unsigned long)barcodes.count]];
         }
 
         NSMutableDictionary *result = [NSMutableDictionary dictionary];
@@ -130,8 +116,8 @@
 
     } @catch (NSException *exception) {
         NSTimeInterval processingTime = [[NSDate date] timeIntervalSinceDate:startTime] * 1000;
-        [Logger error:[NSString stringWithFormat:@"Exception during barcode scanning: %@", exception.reason] error:nil];
-        [Logger performance:@"Barcode scanning processing (error)" durationMs:(int64_t)processingTime];
+        [Logger errorWithMessage:[NSString stringWithFormat:@"Exception during barcode scanning: %@", exception.reason] error:nil];
+        [Logger performanceWithMessage:@"Barcode scanning processing (error)" durationMs:(int64_t)processingTime];
         return nil;
     }
 }
@@ -163,7 +149,7 @@
     if ([lowerFormat isEqualToString:@"pdf417"]) return MLKBarcodeFormatPDF417;
     if ([lowerFormat isEqualToString:@"qrcode"]) return MLKBarcodeFormatQRCode;
 
-    [Logger warn:[NSString stringWithFormat:@"Unknown barcode format: %@", format]];
+    [Logger warnWithMessage:[NSString stringWithFormat:@"Unknown barcode format: %@", format]];
     return 0;
 }
 

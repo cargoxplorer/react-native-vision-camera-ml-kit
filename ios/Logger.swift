@@ -76,6 +76,12 @@ import os.log
         }
     }
 
+    /// Log a debug message (Objective-C compatible overload without default parameter)
+    @objc(debugWithMessage:)
+    public static func debugObjC(_ message: String) {
+        debug(message, tag: TAG)
+    }
+
     /// Log an info message
     @objc public static func info(_ message: String, tag: String = TAG) {
         logLock.lock()
@@ -87,6 +93,12 @@ import os.log
         }
     }
 
+    /// Log an info message (Objective-C compatible overload without default parameter)
+    @objc(infoWithMessage:)
+    public static func infoObjC(_ message: String) {
+        info(message, tag: TAG)
+    }
+
     /// Log a warning message
     @objc public static func warn(_ message: String, tag: String = TAG) {
         logLock.lock()
@@ -96,6 +108,12 @@ import os.log
         if shouldLog {
             os_log("%{public}@", log: OSLog(subsystem: tag, category: "Warning"), type: .default, message)
         }
+    }
+
+    /// Log a warning message (Objective-C compatible overload without default parameter)
+    @objc(warnWithMessage:)
+    public static func warnObjC(_ message: String) {
+        warn(message, tag: TAG)
     }
 
     /// Log an error message
@@ -110,8 +128,26 @@ import os.log
         }
     }
 
+    /// Log an error message (Objective-C compatible overload without default parameters)
+    @objc(errorWithMessage:)
+    public static func errorObjC(_ message: String) {
+        error(message, error: nil, tag: TAG)
+    }
+
+    /// Log an error message with error object (Objective-C compatible)
+    @objc(errorWithMessage:error:)
+    public static func errorObjCWithError(_ message: String, error: Error?) {
+        self.error(message, error: error, tag: TAG)
+    }
+
     /// Log performance metrics (DEBUG level)
     @objc public static func performance(_ message: String, durationMs: Int64, tag: String = TAG) {
         debug("⏱️ \(message): \(durationMs)ms", tag: tag)
+    }
+
+    /// Log performance metrics (Objective-C compatible overload without default parameter)
+    @objc(performanceWithMessage:durationMs:)
+    public static func performanceObjC(_ message: String, durationMs: Int64) {
+        performance(message, durationMs: durationMs, tag: TAG)
     }
 }

@@ -12,20 +12,6 @@
 #import <MLKitVision/MLKitVision.h>
 #import <Photos/Photos.h>
 
-// Forward declarations for MLKit barcode types
-@class MLKBarcode;
-@class MLKBarcodeAddress;
-@class MLKBarcodeContactInfo;
-@class MLKBarcodeDriverLicense;
-@class MLKBarcodeEmail;
-@class MLKBarcodeGeoPoint;
-@class MLKBarcodePersonName;
-@class MLKBarcodePhone;
-@class MLKBarcodeSMS;
-@class MLKBarcodeURLBookmark;
-@class MLKBarcodeWiFi;
-@class MLKBarcodeCalendarEvent;
-
 @implementation StaticBarcodeScannerModule
 
 RCT_EXPORT_MODULE()
@@ -43,7 +29,7 @@ RCT_EXPORT_METHOD(scanBarcode:(NSDictionary *)options
             return;
         }
 
-        [Logger debug:[NSString stringWithFormat:@"Scanning barcode from static image: %@", uri]];
+        [Logger debugWithMessage:[NSString stringWithFormat:@"Scanning barcode from static image: %@", uri]];
 
         // Parse formats if specified
         NSArray *formats = options[@"formats"];
@@ -72,7 +58,7 @@ RCT_EXPORT_METHOD(scanBarcode:(NSDictionary *)options
         // Load image from URI
         [self loadImageFromURI:uri completion:^(UIImage *image, NSError *error) {
             if (error) {
-                [Logger error:[NSString stringWithFormat:@"Failed to load image from URI: %@", uri] error:error];
+                [Logger errorWithMessage:[NSString stringWithFormat:@"Failed to load image from URI: %@", uri] error:error];
                 reject(@"IMAGE_LOAD_ERROR", [NSString stringWithFormat:@"Failed to load image: %@", error.localizedDescription], error);
                 return;
             }
@@ -90,21 +76,21 @@ RCT_EXPORT_METHOD(scanBarcode:(NSDictionary *)options
                 NSTimeInterval processingTime = [[NSDate date] timeIntervalSinceDate:startTime] * 1000;
 
                 if (error) {
-                    [Logger error:@"Error during static barcode scanning" error:error];
-                    [Logger performance:@"Static barcode scanning processing (error)" durationMs:(int64_t)processingTime];
+                    [Logger errorWithMessage:@"Error during static barcode scanning" error:error];
+                    [Logger performanceWithMessage:@"Static barcode scanning processing (error)" durationMs:(int64_t)processingTime];
                     reject(@"SCANNING_ERROR", [NSString stringWithFormat:@"Barcode scanning failed: %@", error.localizedDescription], error);
                     return;
                 }
 
-                [Logger performance:@"Static barcode scanning processing" durationMs:(int64_t)processingTime];
+                [Logger performanceWithMessage:@"Static barcode scanning processing" durationMs:(int64_t)processingTime];
 
                 if (!barcodes || barcodes.count == 0) {
-                    [Logger debug:@"No barcodes detected in static image"];
+                    [Logger debugWithMessage:@"No barcodes detected in static image"];
                     resolve([NSNull null]);
                     return;
                 }
 
-                [Logger debug:[NSString stringWithFormat:@"Barcodes detected in static image: %lu barcode(s)", (unsigned long)barcodes.count]];
+                [Logger debugWithMessage:[NSString stringWithFormat:@"Barcodes detected in static image: %lu barcode(s)", (unsigned long)barcodes.count]];
 
                 NSMutableDictionary *result = [NSMutableDictionary dictionary];
                 result[@"barcodes"] = [self processBarcodes:barcodes];
@@ -114,7 +100,7 @@ RCT_EXPORT_METHOD(scanBarcode:(NSDictionary *)options
         }];
 
     } @catch (NSException *exception) {
-        [Logger error:[NSString stringWithFormat:@"Unexpected error in static barcode scanning: %@", exception.reason] error:nil];
+        [Logger errorWithMessage:[NSString stringWithFormat:@"Unexpected error in static barcode scanning: %@", exception.reason] error:nil];
         reject(@"UNEXPECTED_ERROR", [NSString stringWithFormat:@"Unexpected error: %@", exception.reason], nil);
     }
 }
@@ -173,7 +159,7 @@ RCT_EXPORT_METHOD(scanBarcode:(NSDictionary *)options
     if ([lowerFormat isEqualToString:@"datamatrix"]) return MLKBarcodeFormatDataMatrix;
     if ([lowerFormat isEqualToString:@"pdf417"]) return MLKBarcodeFormatPDF417;
     if ([lowerFormat isEqualToString:@"qrcode"]) return MLKBarcodeFormatQRCode;
-    [Logger warn:[NSString stringWithFormat:@"Unknown barcode format: %@", format]];
+    [Logger warnWithMessage:[NSString stringWithFormat:@"Unknown barcode format: %@", format]];
     return 0;
 }
 

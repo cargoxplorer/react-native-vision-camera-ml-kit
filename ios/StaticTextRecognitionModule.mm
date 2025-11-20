@@ -16,14 +16,6 @@
 #import <MLKitVision/MLKitVision.h>
 #import <Photos/Photos.h>
 
-// Import specific MLKit text types
-@class MLKText;
-@class MLKTextBlock;
-@class MLKTextLine;
-@class MLKTextElement;
-@class MLKTextSymbol;
-@class MLKTextRecognizedLanguage;
-
 @implementation StaticTextRecognitionModule
 
 RCT_EXPORT_MODULE()
@@ -45,7 +37,7 @@ RCT_EXPORT_METHOD(recognizeText:(NSDictionary *)options
         NSNumber *orientationNum = options[@"orientation"];
         int orientation = orientationNum ? [orientationNum intValue] : 0;
 
-        [Logger debug:[NSString stringWithFormat:@"Recognizing text from static image: %@ (language: %@, orientation: %d)",
+        [Logger debugWithMessage:[NSString stringWithFormat:@"Recognizing text from static image: %@ (language: %@, orientation: %d)",
                       uri, language, orientation]];
 
         // Create recognizer based on language
@@ -63,14 +55,14 @@ RCT_EXPORT_METHOD(recognizeText:(NSDictionary *)options
         } else if ([lowerLanguage isEqualToString:@"latin"] || [lowerLanguage isEqualToString:@"default"]) {
             recognizer = [MLKTextRecognizer textRecognizerWithOptions:[[MLKTextRecognizerOptions alloc] init]];
         } else {
-            [Logger warn:[NSString stringWithFormat:@"Unknown language '%@', defaulting to Latin", language]];
+            [Logger warnWithMessage:[NSString stringWithFormat:@"Unknown language '%@', defaulting to Latin", language]];
             recognizer = [MLKTextRecognizer textRecognizerWithOptions:[[MLKTextRecognizerOptions alloc] init]];
         }
 
         // Load image from URI
         [self loadImageFromURI:uri completion:^(UIImage *image, NSError *error) {
             if (error) {
-                [Logger error:[NSString stringWithFormat:@"Failed to load image from URI: %@", uri] error:error];
+                [Logger errorWithMessage:[NSString stringWithFormat:@"Failed to load image from URI: %@", uri] error:error];
                 reject(@"IMAGE_LOAD_ERROR", [NSString stringWithFormat:@"Failed to load image: %@", error.localizedDescription], error);
                 return;
             }
@@ -89,21 +81,21 @@ RCT_EXPORT_METHOD(recognizeText:(NSDictionary *)options
                 NSTimeInterval processingTime = [[NSDate date] timeIntervalSinceDate:startTime] * 1000;
 
                 if (error) {
-                    [Logger error:@"Error during static text recognition" error:error];
-                    [Logger performance:@"Static text recognition processing (error)" durationMs:(int64_t)processingTime];
+                    [Logger errorWithMessage:@"Error during static text recognition" error:error];
+                    [Logger performanceWithMessage:@"Static text recognition processing (error)" durationMs:(int64_t)processingTime];
                     reject(@"RECOGNITION_ERROR", [NSString stringWithFormat:@"Text recognition failed: %@", error.localizedDescription], error);
                     return;
                 }
 
-                [Logger performance:@"Static text recognition processing" durationMs:(int64_t)processingTime];
+                [Logger performanceWithMessage:@"Static text recognition processing" durationMs:(int64_t)processingTime];
 
                 if (!text || text.text.length == 0) {
-                    [Logger debug:@"No text detected in static image"];
+                    [Logger debugWithMessage:@"No text detected in static image"];
                     resolve([NSNull null]);
                     return;
                 }
 
-                [Logger debug:[NSString stringWithFormat:@"Text detected in static image: %lu characters, %lu blocks",
+                [Logger debugWithMessage:[NSString stringWithFormat:@"Text detected in static image: %lu characters, %lu blocks",
                               (unsigned long)text.text.length, (unsigned long)text.blocks.count]];
 
                 NSMutableDictionary *result = [NSMutableDictionary dictionary];
@@ -115,7 +107,7 @@ RCT_EXPORT_METHOD(recognizeText:(NSDictionary *)options
         }];
 
     } @catch (NSException *exception) {
-        [Logger error:[NSString stringWithFormat:@"Unexpected error in static text recognition: %@", exception.reason] error:nil];
+        [Logger errorWithMessage:[NSString stringWithFormat:@"Unexpected error in static text recognition: %@", exception.reason]];
         reject(@"UNEXPECTED_ERROR", [NSString stringWithFormat:@"Unexpected error: %@", exception.reason], nil);
     }
 }

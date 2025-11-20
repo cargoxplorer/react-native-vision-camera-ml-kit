@@ -15,14 +15,6 @@
 #import <MLKitTextRecognitionKorean/MLKitTextRecognitionKorean.h>
 #import <MLKitVision/MLKitVision.h>
 
-// Forward declarations for MLKit text types
-@class MLKText;
-@class MLKTextBlock;
-@class MLKTextLine;
-@class MLKTextElement;
-@class MLKTextSymbol;
-@class MLKTextRecognizedLanguage;
-
 @interface TextRecognitionPlugin ()
 @property (nonatomic, strong) MLKTextRecognizer *recognizer;
 @end
@@ -33,7 +25,7 @@
                   withOptions:(NSDictionary*)options {
     if (self = [super initWithProxy:proxy withOptions:options]) {
         NSString *language = options[@"language"] ?: @"latin";
-        [Logger info:[NSString stringWithFormat:@"Initializing text recognition with language: %@", language]];
+        [Logger infoWithMessage:[NSString stringWithFormat:@"Initializing text recognition with language: %@", language]];
 
         // Create recognizer based on language
         NSString *lowerLanguage = [language lowercaseString];
@@ -49,10 +41,10 @@
         } else if ([lowerLanguage isEqualToString:@"latin"] || [lowerLanguage isEqualToString:@"default"]) {
             self.recognizer = [MLKTextRecognizer textRecognizerWithOptions:[[MLKTextRecognizerOptions alloc] init]];
         } else {
-            [Logger warn:[NSString stringWithFormat:@"Unknown language '%@', defaulting to Latin", language]];
+            [Logger warnWithMessage:[NSString stringWithFormat:@"Unknown language '%@', defaulting to Latin", language]];
             self.recognizer = [MLKTextRecognizer textRecognizerWithOptions:[[MLKTextRecognizerOptions alloc] init]];
         }
-        [Logger info:@"Text recognition initialized successfully"];
+        [Logger infoWithMessage:@"Text recognition initialized successfully"];
     }
     return self;
 }
@@ -67,7 +59,7 @@
         MLKVisionImage *visionImage = [[MLKVisionImage alloc] initWithBuffer:buffer];
         visionImage.orientation = orientation;
 
-        [Logger debug:[NSString stringWithFormat:@"Processing frame: %dx%d, orientation: %ld",
+        [Logger debugWithMessage:[NSString stringWithFormat:@"Processing frame: %dx%d, orientation: %ld",
                       (int)frame.width, (int)frame.height, (long)orientation]];
 
         // Process synchronously (blocking)
@@ -75,19 +67,19 @@
         MLKText *text = [self.recognizer resultsInImage:visionImage error:&error];
 
         NSTimeInterval processingTime = [[NSDate date] timeIntervalSinceDate:startTime] * 1000;
-        [Logger performance:@"Text recognition processing" durationMs:(int64_t)processingTime];
+        [Logger performanceWithMessage:@"Text recognition processing" durationMs:(int64_t)processingTime];
 
         if (error != nil) {
-            [Logger error:@"Error during text recognition" error:error];
+            [Logger errorWithMessage:@"Error during text recognition" error:error];
             return nil;
         }
 
         if (text == nil || text.text.length == 0) {
-            [Logger debug:@"No text detected in frame"];
+            [Logger debugWithMessage:@"No text detected in frame"];
             return nil;
         }
 
-        [Logger debug:[NSString stringWithFormat:@"Text detected: %lu characters, %lu blocks",
+        [Logger debugWithMessage:[NSString stringWithFormat:@"Text detected: %lu characters, %lu blocks",
                       (unsigned long)text.text.length, (unsigned long)text.blocks.count]];
 
         NSMutableDictionary *result = [NSMutableDictionary dictionary];
@@ -98,8 +90,8 @@
 
     } @catch (NSException *exception) {
         NSTimeInterval processingTime = [[NSDate date] timeIntervalSinceDate:startTime] * 1000;
-        [Logger error:[NSString stringWithFormat:@"Exception during text recognition: %@", exception.reason] error:nil];
-        [Logger performance:@"Text recognition processing (error)" durationMs:(int64_t)processingTime];
+        [Logger errorWithMessage:[NSString stringWithFormat:@"Exception during text recognition: %@", exception.reason]];
+        [Logger performanceWithMessage:@"Text recognition processing (error)" durationMs:(int64_t)processingTime];
         return nil;
     }
 }
