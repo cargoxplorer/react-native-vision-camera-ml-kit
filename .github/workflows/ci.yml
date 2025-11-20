@@ -162,6 +162,12 @@ jobs:
           cd example
           npx expo prebuild --platform ios --clean
 
+      - name: Set iOS deployment target
+        run: |
+          cd example/ios
+          # Update all targets in the Xcode project to use iOS 15.5
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9]*\.[0-9]*/IPHONEOS_DEPLOYMENT_TARGET = 15.5/g' *.xcodeproj/project.pbxproj
+
       - name: Install CocoaPods dependencies
         run: |
           cd example/ios

@@ -21,7 +21,7 @@
     "react-native": "0.81.4",
     "react-native-vision-camera": "^4.7.3",
     "react-native-worklets-core": "^1.6.2",
-    "react-native-vision-camera-ml-kit": "link:..",
+    "react-native-vision-camera-mlkit-plugin": "link:..",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0"
   },

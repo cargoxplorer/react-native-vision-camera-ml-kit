@@ -1,6 +1,6 @@
-# react-native-vision-camera-ml-kit
+# react-native-vision-camera-mlkit-plugin
 
-[![npm version](https://img.shields.io/npm/v/react-native-vision-camera-ml-kit.svg)](https://www.npmjs.com/package/react-native-vision-camera-ml-kit)
+[![npm version](https://img.shields.io/npm/v/react-native-vision-camera-mlkit-plugin.svg)](https://www.npmjs.com/package/react-native-vision-camera-mlkit-plugin)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 React Native Vision Camera frame processor plugin for Google ML Kit integration. Provides on-device text recognition, barcode scanning, and document scanning with high performance and comprehensive type safety.
@@ -20,7 +20,7 @@ React Native Vision Camera frame processor plugin for Google ML Kit integration.
 ## Installation
 
 ```bash
-yarn add react-native-vision-camera-ml-kit react-native-vision-camera react-native-worklets-core
+yarn add react-native-vision-camera-mlkit-plugin react-native-vision-camera react-native-worklets-core
 ```
 
 ### iOS Setup
