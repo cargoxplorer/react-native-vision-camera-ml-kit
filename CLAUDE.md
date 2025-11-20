@@ -347,7 +347,7 @@ promise.reject("ERROR_CODE", errorMessage, e)
 - **Native changes**: Require rebuild; JS changes hot reload
 - **Builder Bob**: Outputs to `lib/` in commonjs, module, and typescript formats
 - **Main branch**: `main`
-- **Minimum versions**: Android SDK 21, iOS 16.0 (when implemented)
+- **Minimum versions**: Android SDK 21, iOS 15.5 (required by GoogleMLKit 8.0.0+)
 - **Reference implementation**: Q:\Dev\react-native-vision-camera-ocr-plus (for patterns)
 
 ## Project Tracking
