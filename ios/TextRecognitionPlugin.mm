@@ -15,6 +15,14 @@
 #import <MLKitTextRecognitionKorean/MLKitTextRecognitionKorean.h>
 #import <MLKitVision/MLKitVision.h>
 
+// Forward declarations for MLKit text types
+@class MLKText;
+@class MLKTextBlock;
+@class MLKTextLine;
+@class MLKTextElement;
+@class MLKTextSymbol;
+@class MLKTextRecognizedLanguage;
+
 @interface TextRecognitionPlugin ()
 @property (nonatomic, strong) MLKTextRecognizer *recognizer;
 @end
@@ -28,25 +36,22 @@
         [Logger info:[NSString stringWithFormat:@"Initializing text recognition with language: %@", language]];
 
         // Create recognizer based on language
-        MLKTextRecognizerOptions *recognizerOptions;
         NSString *lowerLanguage = [language lowercaseString];
 
         if ([lowerLanguage isEqualToString:@"chinese"]) {
-            recognizerOptions = [[MLKChineseTextRecognizerOptions alloc] init];
+            self.recognizer = [MLKTextRecognizer textRecognizerWithOptions:[[MLKChineseTextRecognizerOptions alloc] init]];
         } else if ([lowerLanguage isEqualToString:@"devanagari"]) {
-            recognizerOptions = [[MLKDevanagariTextRecognizerOptions alloc] init];
+            self.recognizer = [MLKTextRecognizer textRecognizerWithOptions:[[MLKDevanagariTextRecognizerOptions alloc] init]];
         } else if ([lowerLanguage isEqualToString:@"japanese"]) {
-            recognizerOptions = [[MLKJapaneseTextRecognizerOptions alloc] init];
+            self.recognizer = [MLKTextRecognizer textRecognizerWithOptions:[[MLKJapaneseTextRecognizerOptions alloc] init]];
         } else if ([lowerLanguage isEqualToString:@"korean"]) {
-            recognizerOptions = [[MLKKoreanTextRecognizerOptions alloc] init];
+            self.recognizer = [MLKTextRecognizer textRecognizerWithOptions:[[MLKKoreanTextRecognizerOptions alloc] init]];
         } else if ([lowerLanguage isEqualToString:@"latin"] || [lowerLanguage isEqualToString:@"default"]) {
-            recognizerOptions = [[MLKTextRecognizerOptions alloc] init];
+            self.recognizer = [MLKTextRecognizer textRecognizerWithOptions:[[MLKTextRecognizerOptions alloc] init]];
         } else {
             [Logger warn:[NSString stringWithFormat:@"Unknown language '%@', defaulting to Latin", language]];
-            recognizerOptions = [[MLKTextRecognizerOptions alloc] init];
+            self.recognizer = [MLKTextRecognizer textRecognizerWithOptions:[[MLKTextRecognizerOptions alloc] init]];
         }
-
-        self.recognizer = [MLKTextRecognizer textRecognizerWithOptions:recognizerOptions];
         [Logger info:@"Text recognition initialized successfully"];
     }
     return self;

@@ -16,6 +16,14 @@
 #import <MLKitVision/MLKitVision.h>
 #import <Photos/Photos.h>
 
+// Import specific MLKit text types
+@class MLKText;
+@class MLKTextBlock;
+@class MLKTextLine;
+@class MLKTextElement;
+@class MLKTextSymbol;
+@class MLKTextRecognizedLanguage;
+
 @implementation StaticTextRecognitionModule
 
 RCT_EXPORT_MODULE()
@@ -41,25 +49,23 @@ RCT_EXPORT_METHOD(recognizeText:(NSDictionary *)options
                       uri, language, orientation]];
 
         // Create recognizer based on language
-        MLKTextRecognizerOptions *recognizerOptions;
+        MLKTextRecognizer *recognizer;
         NSString *lowerLanguage = [language lowercaseString];
 
         if ([lowerLanguage isEqualToString:@"chinese"]) {
-            recognizerOptions = [[MLKChineseTextRecognizerOptions alloc] init];
+            recognizer = [MLKTextRecognizer textRecognizerWithOptions:[[MLKChineseTextRecognizerOptions alloc] init]];
         } else if ([lowerLanguage isEqualToString:@"devanagari"]) {
-            recognizerOptions = [[MLKDevanagariTextRecognizerOptions alloc] init];
+            recognizer = [MLKTextRecognizer textRecognizerWithOptions:[[MLKDevanagariTextRecognizerOptions alloc] init]];
         } else if ([lowerLanguage isEqualToString:@"japanese"]) {
-            recognizerOptions = [[MLKJapaneseTextRecognizerOptions alloc] init];
+            recognizer = [MLKTextRecognizer textRecognizerWithOptions:[[MLKJapaneseTextRecognizerOptions alloc] init]];
         } else if ([lowerLanguage isEqualToString:@"korean"]) {
-            recognizerOptions = [[MLKKoreanTextRecognizerOptions alloc] init];
+            recognizer = [MLKTextRecognizer textRecognizerWithOptions:[[MLKKoreanTextRecognizerOptions alloc] init]];
         } else if ([lowerLanguage isEqualToString:@"latin"] || [lowerLanguage isEqualToString:@"default"]) {
-            recognizerOptions = [[MLKTextRecognizerOptions alloc] init];
+            recognizer = [MLKTextRecognizer textRecognizerWithOptions:[[MLKTextRecognizerOptions alloc] init]];
         } else {
             [Logger warn:[NSString stringWithFormat:@"Unknown language '%@', defaulting to Latin", language]];
-            recognizerOptions = [[MLKTextRecognizerOptions alloc] init];
+            recognizer = [MLKTextRecognizer textRecognizerWithOptions:[[MLKTextRecognizerOptions alloc] init]];
         }
-
-        MLKTextRecognizer *recognizer = [MLKTextRecognizer textRecognizerWithOptions:recognizerOptions];
 
         // Load image from URI
         [self loadImageFromURI:uri completion:^(UIImage *image, NSError *error) {
