@@ -6,6 +6,7 @@
 import Foundation
 import VisionCamera
 import MLKitVision
+import MLKitCommon
 import MLKitTextRecognition
 import MLKitTextRecognitionChinese
 import MLKitTextRecognitionDevanagari
@@ -47,7 +48,7 @@ public class TextRecognitionPlugin: FrameProcessorPlugin {
 
         do {
             let buffer = frame.buffer
-            let orientation = getOrientation(frame.orientation)
+            let orientation = frame.orientation
 
             let visionImage = VisionImage(buffer: buffer)
             visionImage.orientation = orientation
@@ -81,16 +82,6 @@ public class TextRecognitionPlugin: FrameProcessorPlugin {
     }
 
     // MARK: - Helper Methods
-
-    private func getOrientation(_ orientationStr: String) -> UIImage.Orientation {
-        switch orientationStr {
-        case "portrait": return .up
-        case "portrait-upside-down": return .down
-        case "landscape-left": return .left
-        case "landscape-right": return .right
-        default: return .up
-        }
-    }
 
     private func processBlocks(_ blocks: [TextBlock]) -> [[String: Any]] {
         return blocks.map { block in
