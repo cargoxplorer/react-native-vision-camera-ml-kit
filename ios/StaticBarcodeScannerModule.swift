@@ -30,30 +30,10 @@ class StaticBarcodeScannerModule: NSObject {
 
         Logger.debug("Scanning barcode from static image: \(uri)")
 
-        // Parse formats if specified
         let formats = options["formats"] as? [String]
-        var scannerOptions: BarcodeScannerOptions
-
-        if let formats = formats, !formats.isEmpty {
-            var combinedFormats: BarcodeFormat = []
-            for formatString in formats {
-                if let parsedFormat = parseBarcodeFormat(formatString) {
-                    combinedFormats.insert(parsedFormat)
-                }
-            }
-
-            if combinedFormats.isEmpty {
-                scannerOptions = BarcodeScannerOptions(formats: .all)
-            } else {
-                scannerOptions = BarcodeScannerOptions(formats: combinedFormats)
-            }
-        } else {
-            scannerOptions = BarcodeScannerOptions(formats: .all)
-        }
-
+        let scannerOptions = createScannerOptions(formats: formats)
         let scanner = BarcodeScanner.barcodeScanner(options: scannerOptions)
 
-        // Load image from URI
         loadImage(from: uri) { [weak self] image, error in
             guard let self = self else { return }
 
@@ -70,7 +50,6 @@ class StaticBarcodeScannerModule: NSObject {
 
             let visionImage = VisionImage(image: image)
 
-            // Process image
             scanner.process(visionImage) { barcodes, error in
                 let processingTime = Int64(Date().timeIntervalSince(startTime) * 1000)
 
@@ -91,54 +70,85 @@ class StaticBarcodeScannerModule: NSObject {
 
                 Logger.debug("Barcodes detected in static image: \(barcodes.count) barcode(s)")
 
-                let result: [String: Any] = [
-                    "barcodes": self.processBarcodes(barcodes)
-                ]
-
+                let result: [String: Any] = ["barcodes": self.processBarcodes(barcodes)]
                 resolve(result)
             }
         }
     }
 
-    // MARK: - Helper Methods
+    // MARK: - Scanner Options
+
+    private func createScannerOptions(formats: [String]?) -> BarcodeScannerOptions {
+        guard let formats = formats, !formats.isEmpty else {
+            return BarcodeScannerOptions(formats: .all)
+        }
+
+        var combinedFormats: BarcodeFormat = []
+        for formatString in formats {
+            if let parsedFormat = parseBarcodeFormat(formatString) {
+                combinedFormats.insert(parsedFormat)
+            }
+        }
+
+        if combinedFormats.isEmpty {
+            return BarcodeScannerOptions(formats: .all)
+        }
+
+        return BarcodeScannerOptions(formats: combinedFormats)
+    }
+
+    // MARK: - Image Loading
 
     private func loadImage(from uri: String, completion: @escaping (UIImage?, Error?) -> Void) {
         if uri.hasPrefix("file://") {
             guard let url = URL(string: uri), let image = UIImage(contentsOfFile: url.path) else {
-                completion(nil, NSError(domain: "ImageLoadError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to load image from file path"]))
+                let error = NSError(domain: "ImageLoadError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to load image from file path"])
+                completion(nil, error)
                 return
             }
             completion(image, nil)
         } else if uri.hasPrefix("ph://") {
-            let assetId = String(uri.dropFirst(5))
-            let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [assetId], options: nil)
-
-            guard let asset = fetchResult.firstObject else {
-                completion(nil, NSError(domain: "ImageLoadError", code: 3, userInfo: [NSLocalizedDescriptionKey: "Photo asset not found"]))
-                return
-            }
-
-            let options = PHImageRequestOptions()
-            options.isSynchronous = false
-            options.deliveryMode = .highQualityFormat
-
-            PHImageManager.default().requestImage(for: asset, targetSize: PHImageManagerMaximumSize, contentMode: .default, options: options) { result, _ in
-                if let image = result {
-                    completion(image, nil)
-                } else {
-                    completion(nil, NSError(domain: "ImageLoadError", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to load image from Photos"]))
-                }
-            }
+            loadFromPhotos(assetId: String(uri.dropFirst(5)), completion: completion)
         } else {
-            if let image = UIImage(contentsOfFile: uri) {
-                completion(image, nil)
-            } else if let url = URL(string: "file://\(uri)"), let image = UIImage(contentsOfFile: url.path) {
+            loadFromPath(uri, completion: completion)
+        }
+    }
+
+    private func loadFromPhotos(assetId: String, completion: @escaping (UIImage?, Error?) -> Void) {
+        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [assetId], options: nil)
+
+        guard let asset = fetchResult.firstObject else {
+            let error = NSError(domain: "ImageLoadError", code: 3, userInfo: [NSLocalizedDescriptionKey: "Photo asset not found"])
+            completion(nil, error)
+            return
+        }
+
+        let options = PHImageRequestOptions()
+        options.isSynchronous = false
+        options.deliveryMode = .highQualityFormat
+
+        PHImageManager.default().requestImage(for: asset, targetSize: PHImageManagerMaximumSize, contentMode: .default, options: options) { result, _ in
+            if let image = result {
                 completion(image, nil)
             } else {
-                completion(nil, NSError(domain: "ImageLoadError", code: 5, userInfo: [NSLocalizedDescriptionKey: "Failed to load image from path"]))
+                let error = NSError(domain: "ImageLoadError", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to load image from Photos"])
+                completion(nil, error)
             }
         }
     }
+
+    private func loadFromPath(_ uri: String, completion: @escaping (UIImage?, Error?) -> Void) {
+        if let image = UIImage(contentsOfFile: uri) {
+            completion(image, nil)
+        } else if let url = URL(string: "file://\(uri)"), let image = UIImage(contentsOfFile: url.path) {
+            completion(image, nil)
+        } else {
+            let error = NSError(domain: "ImageLoadError", code: 5, userInfo: [NSLocalizedDescriptionKey: "Failed to load image from path"])
+            completion(nil, error)
+        }
+    }
+
+    // MARK: - Format Parsing
 
     private func parseBarcodeFormat(_ format: String) -> BarcodeFormat? {
         switch format.lowercased() {
@@ -196,159 +206,196 @@ class StaticBarcodeScannerModule: NSObject {
         }
     }
 
+    // MARK: - Barcode Processing
+
     private func processBarcodes(_ barcodes: [Barcode]) -> [[String: Any]] {
-        return barcodes.map { barcode in
-            var barcodeDict: [String: Any] = [
-                "rawValue": barcode.rawValue ?? "",
-                "displayValue": barcode.displayValue ?? "",
-                "format": barcodeFormatToString(barcode.format),
-                "valueType": valueTypeToString(barcode.valueType),
-                "frame": processRect(barcode.frame),
-                "cornerPoints": processCornerPoints(barcode.cornerPoints)
-            ]
+        var result: [[String: Any]] = []
+        for barcode in barcodes {
+            let processed = processBarcode(barcode)
+            result.append(processed)
+        }
+        return result
+    }
 
-            // Structured data based on type
-            switch barcode.valueType {
-            case .wiFi:
-                if let wifi = barcode.wifi {
-                    var wifiDict: [String: Any] = [
-                        "ssid": wifi.ssid ?? "",
-                        "password": wifi.password ?? ""
-                    ]
-                    let encryptionType: String
-                    switch wifi.type {
-                    case .open: encryptionType = "open"
-                    case .WPA: encryptionType = "wpa"
-                    case .WEP: encryptionType = "wep"
-                    default: encryptionType = "unknown"
-                    }
-                    wifiDict["encryptionType"] = encryptionType
-                    barcodeDict["wifi"] = wifiDict
-                }
+    private func processBarcode(_ barcode: Barcode) -> [String: Any] {
+        var dict: [String: Any] = [:]
 
-            case .URL:
-                if let url = barcode.url?.url {
-                    barcodeDict["url"] = url
-                }
+        dict["rawValue"] = barcode.rawValue ?? ""
+        dict["displayValue"] = barcode.displayValue ?? ""
+        dict["format"] = barcodeFormatToString(barcode.format)
+        dict["valueType"] = valueTypeToString(barcode.valueType)
+        dict["frame"] = processRect(barcode.frame)
+        dict["cornerPoints"] = processCornerPoints(barcode.cornerPoints)
 
-            case .email:
-                if let email = barcode.email?.address {
-                    barcodeDict["email"] = email
-                }
+        addStructuredData(to: &dict, barcode: barcode)
 
-            case .phone:
-                if let phone = barcode.phone?.number {
-                    barcodeDict["phone"] = phone
-                }
+        return dict
+    }
 
-            case .SMS:
-                if let sms = barcode.sms {
-                    barcodeDict["sms"] = [
-                        "phoneNumber": sms.phoneNumber ?? "",
-                        "message": sms.message ?? ""
-                    ]
-                }
-
-            case .geographicCoordinates:
-                if let geo = barcode.geoPoint {
-                    barcodeDict["geo"] = [
-                        "latitude": geo.latitude,
-                        "longitude": geo.longitude
-                    ]
-                }
-
-            case .contactInfo:
-                if let contact = barcode.contactInfo {
-                    var contactDict: [String: Any] = [:]
-
-                    if let name = contact.name {
-                        let fullName = "\(name.first ?? "") \(name.last ?? "")".trimmingCharacters(in: .whitespaces)
-                        contactDict["name"] = fullName
-                    }
-
-                    contactDict["organization"] = contact.organization ?? ""
-
-                    if let phones = contact.phones {
-                        contactDict["phones"] = phones.compactMap { $0.number }
-                    }
-
-                    if let emails = contact.emails {
-                        contactDict["emails"] = emails.compactMap { $0.address }
-                    }
-
-                    if let urls = contact.urls {
-                        contactDict["urls"] = urls
-                    }
-
-                    if let addresses = contact.addresses {
-                        contactDict["addresses"] = addresses.compactMap { $0.addressLines?.joined(separator: ", ") }
-                    }
-
-                    barcodeDict["contact"] = contactDict
-                }
-
-            case .calendarEvent:
-                if let event = barcode.calendarEvent {
-                    var eventDict: [String: Any] = [
-                        "summary": event.summary ?? "",
-                        "description": event.eventDescription ?? "",
-                        "location": event.location ?? ""
-                    ]
-
-                    let formatter = DateFormatter()
-                    formatter.dateFormat = "yyyyMMdd'T'HHmmss'Z'"
-                    formatter.timeZone = TimeZone(abbreviation: "UTC")
-
-                    if let start = event.start {
-                        eventDict["start"] = formatter.string(from: start)
-                    }
-                    if let end = event.end {
-                        eventDict["end"] = formatter.string(from: end)
-                    }
-
-                    barcodeDict["calendarEvent"] = eventDict
-                }
-
-            case .driversLicense:
-                if let license = barcode.driverLicense {
-                    barcodeDict["driverLicense"] = [
-                        "documentType": license.documentType ?? "",
-                        "firstName": license.firstName ?? "",
-                        "lastName": license.lastName ?? "",
-                        "gender": license.gender ?? "",
-                        "addressStreet": license.addressStreet ?? "",
-                        "addressCity": license.addressCity ?? "",
-                        "addressState": license.addressState ?? "",
-                        "addressZip": license.addressZip ?? "",
-                        "licenseNumber": license.licenseNumber ?? "",
-                        "issueDate": license.issueDate ?? "",
-                        "expiryDate": license.expiryDate ?? "",
-                        "birthDate": license.birthDate ?? "",
-                        "issuingCountry": license.issuingCountry ?? ""
-                    ]
-                }
-
-            default:
-                break
+    private func addStructuredData(to dict: inout [String: Any], barcode: Barcode) {
+        switch barcode.valueType {
+        case .wiFi:
+            if let wifi = barcode.wifi {
+                dict["wifi"] = processWifi(wifi)
             }
-
-            return barcodeDict
+        case .URL:
+            if let url = barcode.url?.url {
+                dict["url"] = url
+            }
+        case .email:
+            if let email = barcode.email?.address {
+                dict["email"] = email
+            }
+        case .phone:
+            if let phone = barcode.phone?.number {
+                dict["phone"] = phone
+            }
+        case .SMS:
+            if let sms = barcode.sms {
+                dict["sms"] = processSms(sms)
+            }
+        case .geographicCoordinates:
+            if let geo = barcode.geoPoint {
+                dict["geo"] = processGeo(geo)
+            }
+        case .contactInfo:
+            if let contact = barcode.contactInfo {
+                dict["contact"] = processContact(contact)
+            }
+        case .calendarEvent:
+            if let event = barcode.calendarEvent {
+                dict["calendarEvent"] = processCalendarEvent(event)
+            }
+        case .driversLicense:
+            if let license = barcode.driverLicense {
+                dict["driverLicense"] = processDriverLicense(license)
+            }
+        default:
+            break
         }
     }
 
+    private func processWifi(_ wifi: BarcodeWifi) -> [String: Any] {
+        var dict: [String: Any] = [:]
+        dict["ssid"] = wifi.ssid ?? ""
+        dict["password"] = wifi.password ?? ""
+
+        let encryptionType: String
+        switch wifi.type {
+        case .open: encryptionType = "open"
+        case .WPA: encryptionType = "wpa"
+        case .WEP: encryptionType = "wep"
+        default: encryptionType = "unknown"
+        }
+        dict["encryptionType"] = encryptionType
+
+        return dict
+    }
+
+    private func processSms(_ sms: BarcodeSMS) -> [String: Any] {
+        var dict: [String: Any] = [:]
+        dict["phoneNumber"] = sms.phoneNumber ?? ""
+        dict["message"] = sms.message ?? ""
+        return dict
+    }
+
+    private func processGeo(_ geo: BarcodeGeoPoint) -> [String: Any] {
+        var dict: [String: Any] = [:]
+        dict["latitude"] = geo.latitude
+        dict["longitude"] = geo.longitude
+        return dict
+    }
+
+    private func processContact(_ contact: BarcodeContactInfo) -> [String: Any] {
+        var dict: [String: Any] = [:]
+
+        if let name = contact.name {
+            let firstName = name.first ?? ""
+            let lastName = name.last ?? ""
+            let fullName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
+            dict["name"] = fullName
+        }
+
+        dict["organization"] = contact.organization ?? ""
+
+        if let phones = contact.phones {
+            dict["phones"] = phones.compactMap { $0.number }
+        }
+
+        if let emails = contact.emails {
+            dict["emails"] = emails.compactMap { $0.address }
+        }
+
+        if let urls = contact.urls {
+            dict["urls"] = urls
+        }
+
+        if let addresses = contact.addresses {
+            dict["addresses"] = addresses.compactMap { $0.addressLines?.joined(separator: ", ") }
+        }
+
+        return dict
+    }
+
+    private func processCalendarEvent(_ event: BarcodeCalendarEvent) -> [String: Any] {
+        var dict: [String: Any] = [:]
+        dict["summary"] = event.summary ?? ""
+        dict["description"] = event.eventDescription ?? ""
+        dict["location"] = event.location ?? ""
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd'T'HHmmss'Z'"
+        formatter.timeZone = TimeZone(abbreviation: "UTC")
+
+        if let start = event.start {
+            dict["start"] = formatter.string(from: start)
+        }
+        if let end = event.end {
+            dict["end"] = formatter.string(from: end)
+        }
+
+        return dict
+    }
+
+    private func processDriverLicense(_ license: BarcodeDriverLicense) -> [String: Any] {
+        var dict: [String: Any] = [:]
+        dict["documentType"] = license.documentType ?? ""
+        dict["firstName"] = license.firstName ?? ""
+        dict["lastName"] = license.lastName ?? ""
+        dict["gender"] = license.gender ?? ""
+        dict["addressStreet"] = license.addressStreet ?? ""
+        dict["addressCity"] = license.addressCity ?? ""
+        dict["addressState"] = license.addressState ?? ""
+        dict["addressZip"] = license.addressZip ?? ""
+        dict["licenseNumber"] = license.licenseNumber ?? ""
+        dict["issueDate"] = license.issueDate ?? ""
+        dict["expiryDate"] = license.expiryDate ?? ""
+        dict["birthDate"] = license.birthDate ?? ""
+        dict["issuingCountry"] = license.issuingCountry ?? ""
+        return dict
+    }
+
+    // MARK: - Geometry Processing
+
     private func processRect(_ rect: CGRect) -> [String: CGFloat] {
-        return [
-            "x": rect.midX,
-            "y": rect.midY,
-            "width": rect.width,
-            "height": rect.height
-        ]
+        var dict: [String: CGFloat] = [:]
+        dict["x"] = rect.midX
+        dict["y"] = rect.midY
+        dict["width"] = rect.width
+        dict["height"] = rect.height
+        return dict
     }
 
     private func processCornerPoints(_ cornerPoints: [NSValue]?) -> [[String: Int]] {
         guard let cornerPoints = cornerPoints else { return [] }
-        return cornerPoints.compactMap { $0.cgPointValue }.map { point in
-            ["x": Int(point.x), "y": Int(point.y)]
+        var result: [[String: Int]] = []
+        for pointValue in cornerPoints {
+            let point = pointValue.cgPointValue
+            var pointDict: [String: Int] = [:]
+            pointDict["x"] = Int(point.x)
+            pointDict["y"] = Int(point.y)
+            result.append(pointDict)
         }
+        return result
     }
 }
