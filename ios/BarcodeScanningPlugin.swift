@@ -267,24 +267,28 @@ public class BarcodeScanningPlugin: FrameProcessorPlugin {
             let firstName = name.first ?? ""
             let lastName = name.last ?? ""
             let fullName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
-            dict["name"] = fullName
+            if !fullName.isEmpty {
+                dict["name"] = fullName
+            }
         }
 
-        dict["organization"] = contact.organization ?? ""
+        if let organization = contact.organization, !organization.isEmpty {
+            dict["organization"] = organization
+        }
 
-        if let phones = contact.phones {
+        if let phones = contact.phones, !phones.isEmpty {
             dict["phones"] = phones.compactMap { $0.number }
         }
 
-        if let emails = contact.emails {
+        if let emails = contact.emails, !emails.isEmpty {
             dict["emails"] = emails.compactMap { $0.address }
         }
 
-        if let urls = contact.urls {
+        if let urls = contact.urls, !urls.isEmpty {
             dict["urls"] = urls
         }
 
-        if let addresses = contact.addresses {
+        if let addresses = contact.addresses, !addresses.isEmpty {
             dict["addresses"] = addresses.compactMap { $0.addressLines?.joined(separator: ", ") }
         }
 
