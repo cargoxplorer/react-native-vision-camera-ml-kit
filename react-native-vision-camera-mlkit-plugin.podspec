@@ -28,6 +28,8 @@ Pod::Spec.new do |s|
   s.dependency "react-native-worklets-core"
 
   # Google ML Kit dependencies
+  # TextRecognitionCommon contains full class definitions (MLKText, MLKTextBlock, etc.)
+  s.dependency "GoogleMLKit/TextRecognitionCommon", '>= 8.0.0'
   s.dependency "GoogleMLKit/TextRecognition", '>= 8.0.0'
   s.dependency "GoogleMLKit/TextRecognitionChinese", '>= 8.0.0'
   s.dependency "GoogleMLKit/TextRecognitionDevanagari", '>= 8.0.0'

@@ -8,6 +8,8 @@
 #import <React/RCTUtils.h>
 #import "react-native-vision-camera-ml-kit-Swift.h"
 
+// MLKitTextRecognitionCommon contains the full class definitions (MLKText, MLKTextBlock, etc.)
+#import <MLKitTextRecognitionCommon/MLKitTextRecognitionCommon.h>
 #import <MLKitTextRecognition/MLKitTextRecognition.h>
 #import <MLKitTextRecognitionChinese/MLKitTextRecognitionChinese.h>
 #import <MLKitTextRecognitionDevanagari/MLKitTextRecognitionDevanagari.h>
