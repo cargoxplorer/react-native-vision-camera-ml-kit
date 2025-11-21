@@ -326,10 +326,8 @@ public class BarcodeScanningPlugin: FrameProcessorPlugin {
         dict["addressState"] = license.addressState ?? ""
         dict["addressZip"] = license.addressZip ?? ""
         dict["licenseNumber"] = license.licenseNumber ?? ""
-        dict["expirationDate"] = license.expirationDate ?? ""
         dict["birthDate"] = license.birthDate ?? ""
         dict["issuingCountry"] = license.issuingCountry ?? ""
-        dict["licenseType"] = license.licenseType ?? ""
         return dict
     }
 
