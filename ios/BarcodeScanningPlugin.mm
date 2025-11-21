@@ -8,8 +8,8 @@
 #import <React/RCTUtils.h>
 #import "react-native-vision-camera-ml-kit-Swift.h"
 
-#import <MLKitBarcodeScanning/MLKitBarcodeScanning.h>
-#import <MLKitVision/MLKitVision.h>
+@import MLKitBarcodeScanning;
+@import MLKitVision;
 
 @interface BarcodeScanningPlugin ()
 @property (nonatomic, strong) MLKBarcodeScanner *scanner;

@@ -28,8 +28,6 @@ Pod::Spec.new do |s|
   s.dependency "react-native-worklets-core"
 
   # Google ML Kit dependencies
-  # TextRecognitionCommon contains full class definitions (MLKText, MLKTextBlock, etc.)
-  s.dependency "GoogleMLKit/TextRecognitionCommon", '>= 8.0.0'
   s.dependency "GoogleMLKit/TextRecognition", '>= 8.0.0'
   s.dependency "GoogleMLKit/TextRecognitionChinese", '>= 8.0.0'
   s.dependency "GoogleMLKit/TextRecognitionDevanagari", '>= 8.0.0'
@@ -37,11 +35,13 @@ Pod::Spec.new do |s|
   s.dependency "GoogleMLKit/TextRecognitionKorean", '>= 8.0.0'
   s.dependency "GoogleMLKit/BarcodeScanning", '>= 7.0.0'
 
-  # Compiler flags for C++ interop
-  s.compiler_flags = folly_compiler_flags + ' -DRCT_NEW_ARCH_ENABLED=0'
+  # Compiler flags for C++ interop with modules enabled
+  s.compiler_flags = folly_compiler_flags + ' -DRCT_NEW_ARCH_ENABLED=0 -fmodules -fcxx-modules'
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
     'SWIFT_OBJC_INTERFACE_HEADER_NAME' => 'react-native-vision-camera-ml-kit-Swift.h',
-    'SWIFT_VERSION' => '5.0'
+    'SWIFT_VERSION' => '5.0',
+    'CLANG_ENABLE_MODULES' => 'YES',
+    'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17'
   }
 end

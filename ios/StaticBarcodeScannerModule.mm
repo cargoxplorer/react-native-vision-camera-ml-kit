@@ -8,9 +8,9 @@
 #import <React/RCTUtils.h>
 #import "react-native-vision-camera-ml-kit-Swift.h"
 
-#import <MLKitBarcodeScanning/MLKitBarcodeScanning.h>
-#import <MLKitVision/MLKitVision.h>
-#import <Photos/Photos.h>
+@import MLKitBarcodeScanning;
+@import MLKitVision;
+@import Photos;
 
 @implementation StaticBarcodeScannerModule
 
