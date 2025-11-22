@@ -17,6 +17,32 @@ React Native Vision Camera frame processor plugin for Google ML Kit integration.
 - 🐛 **Robust Error Handling** - Standardized error codes and handling
 - 📊 **Performance Monitoring** - Built-in performance tracking
 
+## Use Cases
+
+### Barcode Scanning
+
+- **Retail Inventory Management** - Instantly lookup products by scanning UPC/EAN barcodes. Use format filtering (`formats: [BarcodeFormat.EAN_13]`) to optimize performance for high-speed scanning in retail environments.
+
+- **Package Tracking & Logistics** - Scan shipping labels and tracking barcodes (Code 128, Code 39) for warehouse operations. Supports multi-barcode detection (up to 10 per frame) for batch processing.
+
+- **VIN Code Scanning** - Decode vehicle identification numbers from Code 39/Code 128 barcodes on automotive parts, registration documents, and dealer inventory for quick vehicle lookup and verification.
+
+- **Smart WiFi Setup** - Scan QR codes to automatically extract and connect to WiFi networks. Structured data extraction provides SSID, password, and encryption type without manual parsing.
+
+- **Digital Business Cards** - Import contacts by scanning QR codes on business cards. Structured vCard extraction automatically parses name, title, phone, email, and address fields.
+
+### Text Recognition (OCR)
+
+- **Receipt & Invoice Processing** - Extract merchant names, amounts, and dates from receipts for expense tracking. Hierarchical text structure (blocks → lines → elements) enables precise field extraction and layout analysis.
+
+- **VIN Plate Recognition** - OCR vehicle identification numbers directly from vehicle plates for automotive applications, parking management, and logistics tracking. Bounding boxes enable accurate plate detection and cropping.
+
+- **Document Digitization** - Convert printed documents to searchable digital text. Confidence scores allow quality filtering to ensure accurate text extraction, while multi-language support handles international documents.
+
+- **License Plate Scanning** - Real-time vehicle tracking for parking lots, toll gates, and warehouse entry/exit. Use bounding boxes for precise plate location and confidence scores for validation.
+
+- **Multilingual Product Labels** - Read ingredient lists, instructions, and product information in 5 language scripts (Latin, Chinese, Japanese, Korean, Devanagari). Perfect for international retail and e-commerce applications.
+
 ## Installation
 
 ```bash
