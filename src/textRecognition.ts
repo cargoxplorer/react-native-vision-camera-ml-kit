@@ -83,7 +83,7 @@ export function createTextRecognitionPlugin(
           frame
         ) as unknown as TextRecognitionResult | null;
         return result;
-      } catch (e) {
+      } catch {
         // If the native plugin throws, surface a graceful null result in the
         // worklet context instead of propagating a JS error.
         return null;

@@ -92,7 +92,7 @@ export function createDocumentScannerPlugin(
           frame
         ) as unknown as DocumentScanningResult | null;
         return result;
-      } catch (e) {
+      } catch {
         // If the native plugin throws, return null instead of propagating
         // an error from the worklet context.
         return null;
