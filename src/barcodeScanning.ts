@@ -137,10 +137,11 @@ export function useBarcodeScanner(
   // but the actual option values remain the same
   const formats = options?.formats;
   const detectInvertedBarcodes = options?.detectInvertedBarcodes;
+  const tryRotations = options?.tryRotations;
 
   return useMemo(
     () => createBarcodeScannerPlugin(options),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [formats, detectInvertedBarcodes]
+    [formats, detectInvertedBarcodes, tryRotations]
   );
 }
