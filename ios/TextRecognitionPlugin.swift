@@ -45,6 +45,13 @@ public class TextRecognitionPlugin: FrameProcessorPlugin {
         Logger.info("Text recognition initialized successfully")
     }
 
+    deinit {
+        // Clean up ML Kit resources when plugin is deallocated
+        // Swift ARC will handle the deallocation, but we log for debugging
+        Logger.debug("TextRecognitionPlugin deallocating - ML Kit recognizer resources will be freed")
+        // Note: ML Kit resources are automatically freed by ARC when textRecognizer is deallocated
+    }
+
     public override func callback(_ frame: Frame, withArguments arguments: [AnyHashable: Any]?) -> Any? {
         // Skip frame if previous processing is still in progress
         processingLock.lock()

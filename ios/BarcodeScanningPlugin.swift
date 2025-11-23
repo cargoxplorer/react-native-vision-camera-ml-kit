@@ -42,6 +42,13 @@ public class BarcodeScanningPlugin: FrameProcessorPlugin {
         Logger.info("Barcode scanner initialized successfully")
     }
 
+    deinit {
+        // Clean up ML Kit resources when plugin is deallocated
+        // Swift ARC will handle the deallocation, but we log for debugging
+        Logger.debug("BarcodeScanningPlugin deallocating - ML Kit scanner resources will be freed")
+        // Note: ML Kit resources are automatically freed by ARC when scanner is deallocated
+    }
+
     private func createScannerOptions(formats: [String]?) -> BarcodeScannerOptions {
         guard let formats = formats, !formats.isEmpty else {
             Logger.info("No format filter specified, scanning all barcode formats")
