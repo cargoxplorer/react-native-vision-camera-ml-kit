@@ -319,6 +319,14 @@ export interface BarcodeScanningOptions {
    * @default false
    */
   detectInvertedBarcodes?: boolean;
+
+  /**
+   * Enable scanning at multiple rotations (0°, 90°, 180°, 270°)
+   * If enabled, scans rotated versions of the image for better detection
+   * Only rotates if initial scan returns no results (minimal performance impact)
+   * @default true
+   */
+  tryRotations?: boolean;
 }
 
 /**
