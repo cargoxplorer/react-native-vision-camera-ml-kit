@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import com.facebook.react.bridge.ActivityEventListener
+import com.facebook.react.bridge.LifecycleEventListener
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -24,13 +25,15 @@ import com.rnvisioncameramlkit.utils.Logger
  * Note: This launches Google's document scanner UI, not a frame processor
  */
 class DocumentScannerModule(reactContext: ReactApplicationContext) :
-    ReactContextBaseJavaModule(reactContext), ActivityEventListener {
+    ReactContextBaseJavaModule(reactContext), ActivityEventListener, LifecycleEventListener {
 
     private var scannerPromise: Promise? = null
     private val DOCUMENT_SCAN_REQUEST_CODE = 9001
 
     init {
         reactContext.addActivityEventListener(this)
+        reactContext.addLifecycleEventListener(this)
+        Logger.debug("DocumentScannerModule initialized with lifecycle listeners")
     }
 
     override fun getName(): String = "DocumentScannerModule"
@@ -190,5 +193,54 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
 
     override fun onNewIntent(intent: Intent) {
         // Not used
+    }
+
+    // LifecycleEventListener implementation
+    override fun onHostResume() {
+        // Not needed for this module
+    }
+
+    override fun onHostPause() {
+        // Not needed for this module
+    }
+
+    override fun onHostDestroy() {
+        // Clean up promise if activity is destroyed during scan
+        cleanupPendingPromise("Activity destroyed during scan")
+        Logger.debug("DocumentScannerModule: Activity destroyed, cleaned up resources")
+    }
+
+    /**
+     * Called when the React instance is being destroyed
+     * Clean up all listeners and pending promises to prevent memory leaks
+     */
+    override fun onCatalystInstanceDestroy() {
+        try {
+            // Clean up any pending promise
+            cleanupPendingPromise("Module destroyed during scan")
+
+            // Remove listeners to prevent memory leak
+            reactApplicationContext.removeActivityEventListener(this)
+            reactApplicationContext.removeLifecycleEventListener(this)
+
+            Logger.debug("DocumentScannerModule destroyed, all listeners removed")
+        } catch (e: Exception) {
+            Logger.error("Error cleaning up DocumentScannerModule", e)
+        }
+    }
+
+    /**
+     * Helper method to clean up pending promise and prevent memory leaks
+     */
+    private fun cleanupPendingPromise(reason: String) {
+        scannerPromise?.let { promise ->
+            try {
+                promise.reject("MODULE_DESTROYED", reason)
+                Logger.warn("Rejected pending scanner promise: $reason")
+            } catch (e: Exception) {
+                Logger.error("Error rejecting pending promise", e)
+            }
+            scannerPromise = null
+        }
     }
 }

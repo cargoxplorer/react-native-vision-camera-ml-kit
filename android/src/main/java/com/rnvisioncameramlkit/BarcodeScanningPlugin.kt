@@ -101,20 +101,37 @@ class BarcodeScanningPlugin(
 
     /**
      * Cleanup resources when plugin is destroyed
-     * Note: Vision Camera's FrameProcessorPlugin doesn't provide an onDestroy lifecycle hook,
-     * so users should call this method manually if needed to release bitmap resources earlier.
-     * Otherwise, the reusableInvertedBitmap will be recycled when GC collects the plugin instance.
+     * Called automatically by finalize() when the plugin is garbage collected,
+     * or can be called manually to release resources earlier.
      */
-    protected fun cleanup() {
+    fun cleanup() {
         try {
-            if (reusableInvertedBitmap != null) {
+            // Recycle bitmap to free native memory immediately
+            if (reusableInvertedBitmap != null && !reusableInvertedBitmap!!.isRecycled) {
                 Logger.debug("Recycling reusable inverted bitmap")
                 reusableInvertedBitmap!!.recycle()
                 reusableInvertedBitmap = null
             }
+
+            // Clear buffer arrays to allow GC
+            invertedYBuffer = null
+            rgbIntBuffer = null
+
+            // Close ML Kit scanner to release native resources
+            scanner.close()
+            Logger.debug("Barcode scanner resources cleaned up successfully")
         } catch (e: Exception) {
             Logger.error("Error cleaning up barcode scanner resources", e)
         }
+    }
+
+    /**
+     * Finalizer to ensure cleanup happens when plugin is garbage collected
+     * This prevents memory leaks of native resources (bitmaps, ML Kit models)
+     */
+    @Suppress("DEPRECATION")
+    protected fun finalize() {
+        cleanup()
     }
 
     override fun callback(frame: Frame, arguments: Map<String, Any>?): Any? {

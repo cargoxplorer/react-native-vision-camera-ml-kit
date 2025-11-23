@@ -57,6 +57,30 @@ class TextRecognitionPlugin(
         Logger.info("Text recognition initialized successfully")
     }
 
+    /**
+     * Cleanup resources when plugin is destroyed
+     * Called automatically by finalize() when the plugin is garbage collected,
+     * or can be called manually to release resources earlier.
+     */
+    fun cleanup() {
+        try {
+            // Close ML Kit recognizer to release native resources
+            recognizer.close()
+            Logger.debug("Text recognizer resources cleaned up successfully")
+        } catch (e: Exception) {
+            Logger.error("Error cleaning up text recognizer resources", e)
+        }
+    }
+
+    /**
+     * Finalizer to ensure cleanup happens when plugin is garbage collected
+     * This prevents memory leaks of ML Kit native resources (models, GPU memory)
+     */
+    @Suppress("DEPRECATION")
+    protected fun finalize() {
+        cleanup()
+    }
+
     override fun callback(frame: Frame, arguments: Map<String, Any>?): Any? {
         // Skip frame if previous processing is still in progress
         if (!isProcessing.compareAndSet(false, true)) {
