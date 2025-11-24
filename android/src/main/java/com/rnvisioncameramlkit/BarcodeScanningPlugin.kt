@@ -37,11 +37,8 @@ class BarcodeScanningPlugin(
     // Note: Only Y buffer needed since we use grayscale (not YUV→RGB)
     private var invertedYBuffer: ByteArray? = null
     private var rgbIntBuffer: IntArray? = null
-    // PERFORMANCE OPTIMIZATION (Priority 1): Reuse bitmap across frames instead of allocating new ones
-    // Eliminates ~2MB allocation per frame and drastically reduces GC pressure (90% reduction)
-    private var reusableInvertedBitmap: android.graphics.Bitmap? = null
-    private var lastBitmapWidth: Int = 0
-    private var lastBitmapHeight: Int = 0
+    // Note: We cannot reuse bitmap objects because ML Kit reads them asynchronously.
+    // Reusing bitmaps causes memory corruption when frames overlap during processing.
 
     init {
         Logger.info("Initializing barcode scanner")
@@ -108,13 +105,6 @@ class BarcodeScanningPlugin(
      */
     override fun close() {
         try {
-            // Recycle bitmap to free native memory immediately
-            if (reusableInvertedBitmap != null && !reusableInvertedBitmap!!.isRecycled) {
-                Logger.debug("Recycling reusable inverted bitmap")
-                reusableInvertedBitmap!!.recycle()
-                reusableInvertedBitmap = null
-            }
-
             // Clear buffer arrays to allow GC
             invertedYBuffer = null
             rgbIntBuffer = null
@@ -319,10 +309,11 @@ class BarcodeScanningPlugin(
             }
 
             if (Logger.isDebugEnabled()) {
-                Logger.debug("Created inverted grayscale bitmap: ${width}x${height}, Y plane inverted (fastPath=${yPixelStride == 1 && yRowStride == width})")
+                Logger.debug("Creating inverted grayscale bitmap: ${width}x${height}, Y plane inverted (fastPath=${yPixelStride == 1 && yRowStride == width})")
             }
 
             // Convert inverted Y plane to grayscale Bitmap for ML Kit
+            // Note: A new bitmap is created for each frame to avoid corruption during async processing
             yToGrayscaleBitmap(width, height, yData)
         } catch (e: Exception) {
             Logger.error("Failed to create inverted bitmap", e)
@@ -340,10 +331,11 @@ class BarcodeScanningPlugin(
      * - No Color.rgb() calls (allocations avoided)
      * - ~4-5x faster than YUV→RGB approach
      *
-     * CRITICAL OPTIMIZATION (Priority 1): Reuses bitmap object across frames
-     * - Eliminates ~2MB allocation per frame when inverted detection is used
-     * - Drastically reduces GC pressure (90% reduction in allocations)
-     * - Only reallocates if frame dimensions change
+     * IMPORTANT: Creates a new bitmap for each frame. We cannot reuse bitmaps because
+     * ML Kit processes images asynchronously. If we reuse the same bitmap object and
+     * modify it while ML Kit is still reading from a previous frame, we get memory
+     * corruption and crashes. The buffer arrays (rgbIntBuffer) can be reused safely
+     * since they're not shared with ML Kit.
      *
      * For barcode detection, grayscale brightness is sufficient for edge detection.
      * Color information is unnecessary and adds computational overhead.
@@ -365,26 +357,14 @@ class BarcodeScanningPlugin(
             rgb[i] = -0x1000000 or (gray shl 16) or (gray shl 8) or gray
         }
 
-        // OPTIMIZATION: Reuse bitmap if dimensions match, otherwise allocate new one
-        if (reusableInvertedBitmap == null || lastBitmapWidth != width || lastBitmapHeight != height) {
-            if (reusableInvertedBitmap != null) {
-                Logger.debug("Bitmap dimensions changed (${lastBitmapWidth}x${lastBitmapHeight} → ${width}x${height}), reallocating")
-                reusableInvertedBitmap!!.recycle()
-            }
-            reusableInvertedBitmap = android.graphics.Bitmap.createBitmap(
-                width,
-                height,
-                android.graphics.Bitmap.Config.RGB_565
-            )
-            lastBitmapWidth = width
-            lastBitmapHeight = height
-            if (Logger.isDebugEnabled()) {
-                Logger.debug("Created new reusable inverted bitmap: ${width}x${height}")
-            }
-        }
-
-        reusableInvertedBitmap!!.setPixels(rgb, 0, width, 0, 0, width, height)
-        return reusableInvertedBitmap!!
+        // Always create a new bitmap - ML Kit needs stable pixel data during async processing
+        val bitmap = android.graphics.Bitmap.createBitmap(
+            width,
+            height,
+            android.graphics.Bitmap.Config.RGB_565
+        )
+        bitmap.setPixels(rgb, 0, width, 0, 0, width, height)
+        return bitmap
     }
 
     companion object {
