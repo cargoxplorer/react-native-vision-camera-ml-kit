@@ -76,13 +76,13 @@ public class BarcodeScanningPlugin: FrameProcessorPlugin {
         return BarcodeScannerOptions(formats: combinedFormats)
     }
 
-    public override func callback(_ frame: Frame, withArguments arguments: [AnyHashable: Any]?) -> Any? {
+    public override func callback(_ frame: Frame, withArguments arguments: [AnyHashable: Any]?) -> Any {
         // Skip frame if previous processing is still in progress
         processingLock.lock()
         if isProcessing {
             processingLock.unlock()
             Logger.debug("Skipping frame - previous processing still in progress")
-            return nil
+            return [:]
         }
         isProcessing = true
         processingLock.unlock()
@@ -106,7 +106,7 @@ public class BarcodeScanningPlugin: FrameProcessorPlugin {
             Logger.debug("Processing frame: \(frame.width)x\(frame.height), orientation: \(orientation.rawValue)")
 
             let visionImage = VisionImage(buffer: frame.buffer)
-            visionImage.orientation = orientation
+            visionImage.orientation = getOrientation(orientation: orientation)
 
             let barcodes = try scanner.results(in: visionImage)
 
@@ -115,7 +115,7 @@ public class BarcodeScanningPlugin: FrameProcessorPlugin {
 
             if barcodes.isEmpty {
                 Logger.debug("No barcodes detected in frame")
-                return nil
+                return [:]
             }
 
             Logger.debug("Barcodes detected: \(barcodes.count) barcode(s)")
@@ -127,7 +127,24 @@ public class BarcodeScanningPlugin: FrameProcessorPlugin {
             let processingTime = Int64(Date().timeIntervalSince(startTime) * 1000)
             Logger.error("Exception during barcode scanning: \(error.localizedDescription)")
             Logger.performance("Barcode scanning processing (error)", durationMs: processingTime)
-            return nil
+            return [:]
+        }
+    }
+
+    // MARK: - Orientation Mapping
+
+    private func getOrientation(orientation: UIImage.Orientation) -> UIImage.Orientation {
+        switch orientation {
+        case .up:
+            return .up
+        case .left:
+            return .right  // Swap left and right
+        case .down:
+            return .down
+        case .right:
+            return .left   // Swap left and right
+        default:
+            return .up
         }
     }
 

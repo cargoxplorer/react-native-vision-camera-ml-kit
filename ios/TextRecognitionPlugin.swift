@@ -52,13 +52,13 @@ public class TextRecognitionPlugin: FrameProcessorPlugin {
         // Note: ML Kit resources are automatically freed by ARC when textRecognizer is deallocated
     }
 
-    public override func callback(_ frame: Frame, withArguments arguments: [AnyHashable: Any]?) -> Any? {
+    public override func callback(_ frame: Frame, withArguments arguments: [AnyHashable: Any]?) -> Any {
         // Skip frame if previous processing is still in progress
         processingLock.lock()
         if isProcessing {
             processingLock.unlock()
             Logger.debug("Skipping frame - previous processing still in progress")
-            return nil
+            return [:]
         }
         isProcessing = true
         processingLock.unlock()
@@ -80,7 +80,7 @@ public class TextRecognitionPlugin: FrameProcessorPlugin {
             let orientation = frame.orientation
 
             let visionImage = VisionImage(buffer: frame.buffer)
-            visionImage.orientation = orientation
+            visionImage.orientation = getOrientation(orientation: orientation)
 
             Logger.debug("Processing frame: \(frame.width)x\(frame.height), orientation: \(orientation.rawValue)")
 
@@ -92,7 +92,7 @@ public class TextRecognitionPlugin: FrameProcessorPlugin {
 
             if text.text.isEmpty {
                 Logger.debug("No text detected in frame")
-                return nil
+                return [:]
             }
 
             Logger.debug("Text detected: \(text.text.count) characters, \(text.blocks.count) blocks")
@@ -106,7 +106,24 @@ public class TextRecognitionPlugin: FrameProcessorPlugin {
             let processingTime = Int64(Date().timeIntervalSince(startTime) * 1000)
             Logger.error("Error during text recognition: \(error.localizedDescription)")
             Logger.performance("Text recognition processing (error)", durationMs: processingTime)
-            return nil
+            return [:]
+        }
+    }
+
+    // MARK: - Orientation Mapping
+
+    private func getOrientation(orientation: UIImage.Orientation) -> UIImage.Orientation {
+        switch orientation {
+        case .up:
+            return .up
+        case .left:
+            return .right  // Swap left and right
+        case .down:
+            return .down
+        case .right:
+            return .left   // Swap left and right
+        default:
+            return .up
         }
     }
 
