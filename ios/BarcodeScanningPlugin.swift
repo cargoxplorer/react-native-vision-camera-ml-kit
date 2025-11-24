@@ -87,14 +87,10 @@ public class BarcodeScanningPlugin: FrameProcessorPlugin {
         isProcessing = true
         processingLock.unlock()
 
-        // Use Vision Camera's reference counting to keep frame alive during processing
-        frame.incrementRefCount()
-
         let startTime = Date()
 
         defer {
-            // Release frame reference and reset processing flag
-            frame.decrementRefCount()
+            // Reset processing flag
             processingLock.lock()
             isProcessing = false
             processingLock.unlock()
