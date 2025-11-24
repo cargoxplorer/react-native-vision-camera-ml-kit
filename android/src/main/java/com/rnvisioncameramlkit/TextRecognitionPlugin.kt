@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class TextRecognitionPlugin(
     proxy: VisionCameraProxy,
     options: Map<String, Any>?
-) : FrameProcessorPlugin() {
+) : FrameProcessorPlugin(), AutoCloseable {
 
     private var recognizer: TextRecognizer
     private val isProcessing = AtomicBoolean(false)
@@ -58,11 +58,13 @@ class TextRecognitionPlugin(
     }
 
     /**
-     * Cleanup resources when plugin is destroyed
-     * Called automatically by finalize() when the plugin is garbage collected,
-     * or can be called manually to release resources earlier.
+     * Cleanup resources when plugin is destroyed.
+     * Note: Vision Camera v4 does not provide explicit lifecycle callbacks for plugins.
+     * ML Kit's TextRecognizer implements Closeable, so resources will be freed when
+     * the plugin instance is garbage collected. For manual cleanup, this method can
+     * be called externally if needed.
      */
-    fun cleanup() {
+    override fun close() {
         try {
             // Close ML Kit recognizer to release native resources
             recognizer.close()
@@ -70,15 +72,6 @@ class TextRecognitionPlugin(
         } catch (e: Exception) {
             Logger.error("Error cleaning up text recognizer resources", e)
         }
-    }
-
-    /**
-     * Finalizer to ensure cleanup happens when plugin is garbage collected
-     * This prevents memory leaks of ML Kit native resources (models, GPU memory)
-     */
-    @Suppress("DEPRECATION")
-    protected fun finalize() {
-        cleanup()
     }
 
     override fun callback(frame: Frame, arguments: Map<String, Any>?): Any? {

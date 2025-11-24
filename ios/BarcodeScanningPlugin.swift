@@ -337,21 +337,25 @@ public class BarcodeScanningPlugin: FrameProcessorPlugin {
         return dict
     }
 
+    // Reusable DateFormatter to avoid expensive allocations per frame
+    private static let calendarEventDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd'T'HHmmss'Z'"
+        formatter.timeZone = TimeZone(abbreviation: "UTC")
+        return formatter
+    }()
+
     private func processCalendarEvent(_ event: BarcodeCalendarEvent) -> [String: Any] {
         var dict: [String: Any] = [:]
         dict["summary"] = event.summary ?? ""
         dict["description"] = event.eventDescription ?? ""
         dict["location"] = event.location ?? ""
 
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMdd'T'HHmmss'Z'"
-        formatter.timeZone = TimeZone(abbreviation: "UTC")
-
         if let start = event.start {
-            dict["start"] = formatter.string(from: start)
+            dict["start"] = Self.calendarEventDateFormatter.string(from: start)
         }
         if let end = event.end {
-            dict["end"] = formatter.string(from: end)
+            dict["end"] = Self.calendarEventDateFormatter.string(from: end)
         }
 
         return dict

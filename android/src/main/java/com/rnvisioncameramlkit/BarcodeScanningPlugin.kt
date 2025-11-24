@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class BarcodeScanningPlugin(
     proxy: VisionCameraProxy,
     options: Map<String, Any>?
-) : FrameProcessorPlugin() {
+) : FrameProcessorPlugin(), AutoCloseable {
 
     private var scanner: BarcodeScanner
     private val isProcessing = AtomicBoolean(false)
@@ -100,11 +100,13 @@ class BarcodeScanningPlugin(
     }
 
     /**
-     * Cleanup resources when plugin is destroyed
-     * Called automatically by finalize() when the plugin is garbage collected,
-     * or can be called manually to release resources earlier.
+     * Cleanup resources when plugin is destroyed.
+     * Note: Vision Camera v4 does not provide explicit lifecycle callbacks for plugins.
+     * ML Kit's BarcodeScanner implements Closeable, so resources will be freed when
+     * the plugin instance is garbage collected. For manual cleanup, this method can
+     * be called externally if needed.
      */
-    fun cleanup() {
+    override fun close() {
         try {
             // Recycle bitmap to free native memory immediately
             if (reusableInvertedBitmap != null && !reusableInvertedBitmap!!.isRecycled) {
@@ -123,15 +125,6 @@ class BarcodeScanningPlugin(
         } catch (e: Exception) {
             Logger.error("Error cleaning up barcode scanner resources", e)
         }
-    }
-
-    /**
-     * Finalizer to ensure cleanup happens when plugin is garbage collected
-     * This prevents memory leaks of native resources (bitmaps, ML Kit models)
-     */
-    @Suppress("DEPRECATION")
-    protected fun finalize() {
-        cleanup()
     }
 
     override fun callback(frame: Frame, arguments: Map<String, Any>?): Any? {
