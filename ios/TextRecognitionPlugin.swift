@@ -17,8 +17,6 @@ import MLKitTextRecognitionKorean
 public class TextRecognitionPlugin: FrameProcessorPlugin {
 
     private var textRecognizer: TextRecognizer!
-    private let processingLock = NSLock()
-    private var isProcessing = false
 
     public override init(proxy: VisionCameraProxyHolder, options: [AnyHashable: Any]! = [:]) {
         super.init(proxy: proxy, options: options)
@@ -53,24 +51,7 @@ public class TextRecognitionPlugin: FrameProcessorPlugin {
     }
 
     public override func callback(_ frame: Frame, withArguments arguments: [AnyHashable: Any]?) -> Any? {
-        // Skip frame if previous processing is still in progress
-        processingLock.lock()
-        if isProcessing {
-            processingLock.unlock()
-            Logger.debug("Skipping frame - previous processing still in progress")
-            return nil
-        }
-        isProcessing = true
-        processingLock.unlock()
-
         let startTime = Date()
-
-        defer {
-            // Reset processing flag
-            processingLock.lock()
-            isProcessing = false
-            processingLock.unlock()
-        }
 
         do {
             let orientation = frame.orientation

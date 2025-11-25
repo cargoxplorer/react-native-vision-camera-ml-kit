@@ -46,31 +46,39 @@ public class ImageUtils: NSObject {
                 return nil
             }
 
-            do {
-                var image = CIImage(cvPixelBuffer: pixelBuffer)
-
-                // Apply rotation if needed
-                if rotation != 0 {
-                    let radians = CGFloat(rotation) * CGFloat.pi / 180.0
-                    let rotationTransform = CGAffineTransform(rotationAngle: radians)
-                    image = image.transformed(by: rotationTransform)
-                }
-
-                // Convert CIImage to CGImage using the shared context
-                contextLock.lock()
-                guard let cgImage = ciContext.createCGImage(image, from: image.extent) else {
-                    contextLock.unlock()
-                    Logger.error("Failed to create CGImage from CIImage")
-                    return nil
-                }
-                contextLock.unlock()
-
-                // Create UIImage from CGImage
-                return UIImage(cgImage: cgImage, scale: 1.0, orientation: .up)
-            } catch {
-                Logger.error("Failed to convert sample buffer to image", error: error)
+            // Validate rotation parameter
+            guard [0, 90, 180, 270].contains(rotation) else {
+                Logger.error("Invalid rotation value: \(rotation). Must be 0, 90, 180, or 270")
                 return nil
             }
+
+            var image = CIImage(cvPixelBuffer: pixelBuffer)
+
+            // Apply rotation if needed
+            if rotation != 0 {
+                let radians = CGFloat(rotation) * CGFloat.pi / 180.0
+                let rotationTransform = CGAffineTransform(rotationAngle: radians)
+                image = image.transformed(by: rotationTransform)
+
+                // Adjust extent after rotation to handle potentially negative origins
+                let extent = image.extent
+                if extent.origin.x != 0 || extent.origin.y != 0 {
+                    let offsetTransform = CGAffineTransform(translationX: -extent.origin.x, y: -extent.origin.y)
+                    image = image.transformed(by: offsetTransform)
+                }
+            }
+
+            // Convert CIImage to CGImage using the shared context (with thread safety)
+            contextLock.lock()
+            defer { contextLock.unlock() }
+
+            guard let cgImage = ciContext.createCGImage(image, from: image.extent) else {
+                Logger.error("Failed to create CGImage from CIImage")
+                return nil
+            }
+
+            // Create UIImage from CGImage
+            return UIImage(cgImage: cgImage, scale: 1.0, orientation: .up)
         }
     }
 
@@ -104,12 +112,9 @@ public class ImageUtils: NSObject {
             return nil
         }
 
-        do {
-            return CIImage(cvPixelBuffer: pixelBuffer)
-        } catch {
-            Logger.error("Failed to create CIImage from pixel buffer", error: error)
-            return nil
-        }
+        // Create CIImage from pixel buffer
+        // Note: CIImage(cvPixelBuffer:) does not throw; it returns immediately
+        return CIImage(cvPixelBuffer: pixelBuffer)
     }
 
     /// Invert the colors of a CIImage (for white-on-black barcode detection).
@@ -117,24 +122,19 @@ public class ImageUtils: NSObject {
     /// - Parameter ciImage: The input CIImage
     /// - Returns: An inverted CIImage, or nil on failure
     @objc public static func invertImage(_ ciImage: CIImage) -> CIImage? {
-        do {
-            guard let invertFilter = CIFilter(name: "CIColorInvert") else {
-                Logger.error("Failed to create color invert filter")
-                return nil
-            }
-
-            invertFilter.setValue(ciImage, forKey: kCIInputImageKey)
-
-            guard let outputImage = invertFilter.outputImage else {
-                Logger.error("Color invert filter produced no output")
-                return nil
-            }
-
-            return outputImage
-        } catch {
-            Logger.error("Failed to invert image", error: error)
+        guard let invertFilter = CIFilter(name: "CIColorInvert") else {
+            Logger.error("Failed to create color invert filter")
             return nil
         }
+
+        invertFilter.setValue(ciImage, forKey: kCIInputImageKey)
+
+        guard let outputImage = invertFilter.outputImage else {
+            Logger.error("Color invert filter produced no output")
+            return nil
+        }
+
+        return outputImage
     }
 
     /// Convert a CIImage to UIImage.
@@ -143,12 +143,12 @@ public class ImageUtils: NSObject {
     /// - Returns: A UIImage, or nil on failure
     @objc public static func uiImageFromCIImage(_ ciImage: CIImage) -> UIImage? {
         contextLock.lock()
+        defer { contextLock.unlock() }
+
         guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else {
-            contextLock.unlock()
             Logger.error("Failed to create CGImage from CIImage for UIImage conversion")
             return nil
         }
-        contextLock.unlock()
 
         return UIImage(cgImage: cgImage, scale: 1.0, orientation: .up)
     }
