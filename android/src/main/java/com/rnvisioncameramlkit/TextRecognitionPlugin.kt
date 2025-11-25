@@ -81,7 +81,8 @@ class TextRecognitionPlugin(
 
         try {
             val mediaImage: Image = frame.image
-            val rotationDegrees = frame.imageProxy.imageInfo.rotationDegrees
+            val imageProxy = frame.imageProxy
+            val rotationDegrees = imageProxy.imageInfo.rotationDegrees
 
             if (Logger.isDebugEnabled()) {
                 Logger.debug("Processing frame: ${frame.width}x${frame.height}, rotation: $rotationDegrees")
@@ -92,6 +93,13 @@ class TextRecognitionPlugin(
             // The ImageReader has a limited buffer, and holding Image references during
             // ML Kit processing causes the buffer to fill up and crash.
             val clonedBitmap = ImageUtils.imageToBitmap(mediaImage, 0)  // Don't apply rotation yet
+
+            // CRITICAL: Close the ImageProxy immediately after cloning to release the ImageReader slot.
+            // This allows the camera to continue capturing frames while we process asynchronously.
+            // The Frame object stays alive (for VisionCamera's ref counting), but the underlying
+            // image buffer is released back to the camera.
+            imageProxy.close()
+
             if (clonedBitmap == null) {
                 Logger.error("Failed to clone camera image to bitmap")
                 return null
