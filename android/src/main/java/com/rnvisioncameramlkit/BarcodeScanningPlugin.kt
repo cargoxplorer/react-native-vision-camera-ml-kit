@@ -17,7 +17,6 @@ import com.mrousavy.camera.frameprocessors.FrameProcessorPlugin
 import com.mrousavy.camera.frameprocessors.VisionCameraProxy
 import com.rnvisioncameramlkit.utils.ImageUtils
 import com.rnvisioncameramlkit.utils.Logger
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Barcode Scanning Frame Processor Plugin
@@ -31,7 +30,6 @@ class BarcodeScanningPlugin(
 ) : FrameProcessorPlugin(), AutoCloseable {
 
     private var scanner: BarcodeScanner
-    private val isProcessing = AtomicBoolean(false)
     private var detectInvertedBarcodes: Boolean = false
     private var tryRotations: Boolean = true  // Try 90 degree rotation if no barcodes found (default: enabled)
     // Reusable buffers to avoid per-frame allocations during inversion
@@ -122,14 +120,6 @@ class BarcodeScanningPlugin(
     }
 
     override fun callback(frame: Frame, arguments: Map<String, Any>?): Any? {
-        // Skip frame if previous processing is still in progress
-        if (!isProcessing.compareAndSet(false, true)) {
-            if (Logger.isDebugEnabled()) {
-                Logger.debug("Skipping frame - previous processing still in progress")
-            }
-            return null
-        }
-
         val startTime = System.currentTimeMillis()
 
         try {
@@ -256,8 +246,6 @@ class BarcodeScanningPlugin(
             Logger.error("Error during barcode scanning", e)
             Logger.performance("Barcode scanning processing (error)", processingTime)
             return null
-        } finally {
-            isProcessing.set(false)
         }
     }
 
