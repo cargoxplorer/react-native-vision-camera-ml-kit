@@ -19,11 +19,6 @@ public class BarcodeScanningPlugin: FrameProcessorPlugin {
     private var isProcessing = false
     private var detectInvertedBarcodes: Bool = false
     private var tryRotations: Bool = true
-    
-    // Reusable CIContext for image processing (expensive to create)
-    private lazy var ciContext: CIContext = {
-        return CIContext(options: [.useSoftwareRenderer: false])
-    }()
 
     public override init(proxy: VisionCameraProxyHolder, options: [AnyHashable: Any]! = [:]) {
         super.init(proxy: proxy, options: options)
@@ -121,7 +116,12 @@ public class BarcodeScanningPlugin: FrameProcessorPlugin {
             var barcodes: [Barcode] = []
 
             // 1. Try normal image at current orientation
-            let visionImage = VisionImage(buffer: frame.buffer)
+            // Clone the camera buffer to UIImage to release the original buffer immediately
+            // This prevents buffer exhaustion issues when ML Kit processing takes longer than camera frame rate
+            guard let visionImage = ImageUtils.visionImageFromSampleBuffer(frame.buffer) else {
+                Logger.error("Failed to create vision image from sample buffer")
+                return nil
+            }
             visionImage.orientation = orientations[0]
             barcodes = try scanner.results(in: visionImage)
 
@@ -222,32 +222,20 @@ public class BarcodeScanningPlugin: FrameProcessorPlugin {
     
     /// Create an inverted (negative) version of the image for detecting white-on-black barcodes
     private func createInvertedImage(from sampleBuffer: CMSampleBuffer) -> UIImage? {
-        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
-            Logger.error("Failed to get pixel buffer from sample buffer")
+        // Clone the buffer first using ImageUtils for proper lifecycle management
+        guard let ciImage = ImageUtils.ciImageFromSampleBuffer(sampleBuffer) else {
+            Logger.error("Failed to create CIImage from sample buffer")
             return nil
         }
-        
-        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
-        
-        // Apply color invert filter
-        guard let invertFilter = CIFilter(name: "CIColorInvert") else {
-            Logger.error("Failed to create CIColorInvert filter")
+
+        // Invert the cloned image
+        guard let invertedCIImage = ImageUtils.invertImage(ciImage) else {
+            Logger.error("Failed to invert image")
             return nil
         }
-        invertFilter.setValue(ciImage, forKey: kCIInputImageKey)
-        
-        guard let outputImage = invertFilter.outputImage else {
-            Logger.error("Failed to get output from invert filter")
-            return nil
-        }
-        
-        // Convert to CGImage then UIImage
-        guard let cgImage = ciContext.createCGImage(outputImage, from: outputImage.extent) else {
-            Logger.error("Failed to create CGImage from CIImage")
-            return nil
-        }
-        
-        return UIImage(cgImage: cgImage)
+
+        // Convert inverted CIImage to UIImage
+        return ImageUtils.uiImageFromCIImage(invertedCIImage)
     }
 
     // MARK: - Orientation Mapping

@@ -75,7 +75,12 @@ public class TextRecognitionPlugin: FrameProcessorPlugin {
         do {
             let orientation = frame.orientation
 
-            let visionImage = VisionImage(buffer: frame.buffer)
+            // Clone the camera buffer to UIImage to release the original buffer immediately
+            // This prevents buffer exhaustion issues when ML Kit processing takes longer than camera frame rate
+            guard let visionImage = ImageUtils.visionImageFromSampleBuffer(frame.buffer) else {
+                Logger.error("Failed to create vision image from sample buffer")
+                return nil
+            }
             visionImage.orientation = getOrientation(orientation: orientation)
 
             Logger.debug("Processing frame: \(frame.width)x\(frame.height), orientation: \(orientation.rawValue)")
