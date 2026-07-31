@@ -17,6 +17,8 @@ import com.mrousavy.camera.frameprocessors.FrameProcessorPlugin
 import com.mrousavy.camera.frameprocessors.VisionCameraProxy
 import com.rnvisioncameramlkit.utils.ImageUtils
 import com.rnvisioncameramlkit.utils.Logger
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * Barcode Scanning Frame Processor Plugin
@@ -32,6 +34,8 @@ class BarcodeScanningPlugin(
     private var scanner: BarcodeScanner
     private var detectInvertedBarcodes: Boolean = false
     private var tryRotations: Boolean = true  // Try 90 degree rotation if no barcodes found (default: enabled)
+    private var scanRegion: ScanRegionSpec? = null
+    private var warnedInvalidRegion = false
     // Reusable buffers to avoid per-frame allocations during inversion
     // Note: Only Y buffer needed since we use grayscale (not YUV→RGB)
     private var invertedYBuffer: ByteArray? = null
@@ -53,6 +57,11 @@ class BarcodeScanningPlugin(
         tryRotations = options?.get("tryRotations") as? Boolean ?: true
         if (!tryRotations) {
             Logger.info("90 degree rotation attempts DISABLED - only using current camera rotation (saves ~10-20ms per frame)")
+        }
+
+        scanRegion = ScanRegionSpec.parse(options?.get("scanRegion"))
+        scanRegion?.let {
+            Logger.info("Scan region enabled: $it — decoding restricted to this area")
         }
 
         val formats = options?.get("formats") as? List<*>
@@ -142,6 +151,36 @@ class BarcodeScanningPlugin(
                 return null
             }
 
+            val rawWidth = clonedBitmap.width
+            val rawHeight = clonedBitmap.height
+
+            val region = ScanRegionSpec.parse(arguments?.get("scanRegion")) ?: scanRegion
+
+            // Crop to the scan region so ML Kit never sees barcodes outside it
+            var cropRect: Rect? = null
+            var workingBitmap = clonedBitmap
+            if (region != null) {
+                val rect = computeCropRect(region, rawWidth, rawHeight, baseRotation)
+                if (rect == null) {
+                    if (!warnedInvalidRegion) {
+                        warnedInvalidRegion = true
+                        Logger.warn("scanRegion resolves to an empty area — skipping decode. Region: $region, frame: ${rawWidth}x${rawHeight}, rotation: $baseRotation")
+                    }
+                    clonedBitmap.recycle()
+                    return null
+                }
+                if (rect.left > 0 || rect.top > 0 || rect.width() < rawWidth || rect.height() < rawHeight) {
+                    val cropped = android.graphics.Bitmap.createBitmap(
+                        clonedBitmap, rect.left, rect.top, rect.width(), rect.height()
+                    )
+                    if (cropped !== clonedBitmap) {
+                        clonedBitmap.recycle()
+                    }
+                    workingBitmap = cropped
+                    cropRect = rect
+                }
+            }
+
             // Try scanning at current rotation and optionally 90 degree rotation
             val rotations = if (tryRotations) {
                 listOf(baseRotation, (baseRotation + 90) % 360)
@@ -149,10 +188,11 @@ class BarcodeScanningPlugin(
                 listOf(baseRotation)  // Only try current rotation
             }
             var barcodes: List<Barcode> = emptyList()
+            var usedRotation = rotations[0]
 
             try {
                 // 1. Try normal image at current rotation (using cloned bitmap)
-                val image = InputImage.fromBitmap(clonedBitmap, rotations[0])
+                val image = InputImage.fromBitmap(workingBitmap, rotations[0])
                 val task: Task<List<Barcode>> = scanner.process(image)
                 barcodes = Tasks.await(task)
 
@@ -165,12 +205,15 @@ class BarcodeScanningPlugin(
                     if (Logger.isDebugEnabled()) {
                         Logger.debug("No barcodes at rotation ${rotations[0]}, trying ${rotations[1]}")
                     }
-                    val image90 = InputImage.fromBitmap(clonedBitmap, rotations[1])
+                    val image90 = InputImage.fromBitmap(workingBitmap, rotations[1])
                     val task90: Task<List<Barcode>> = scanner.process(image90)
                     barcodes = Tasks.await(task90)
 
-                    if (barcodes.isNotEmpty() && Logger.isDebugEnabled()) {
-                        Logger.debug("Found ${barcodes.size} barcode(s) at rotation ${rotations[1]}")
+                    if (barcodes.isNotEmpty()) {
+                        usedRotation = rotations[1]
+                        if (Logger.isDebugEnabled()) {
+                            Logger.debug("Found ${barcodes.size} barcode(s) at rotation ${rotations[1]}")
+                        }
                     }
                 }
 
@@ -182,8 +225,8 @@ class BarcodeScanningPlugin(
 
                     val startInvertTime = System.currentTimeMillis()
 
-                    // Create a single inverted Bitmap from the cloned bitmap (not the original mediaImage)
-                    val invertedBitmap = createInvertedBitmapFromBitmap(clonedBitmap)
+                    // Create a single inverted Bitmap from the working bitmap (not the original mediaImage)
+                    val invertedBitmap = createInvertedBitmapFromBitmap(workingBitmap)
 
                     if (invertedBitmap != null) {
                         try {
@@ -193,6 +236,7 @@ class BarcodeScanningPlugin(
                             barcodes = Tasks.await(invertedTask)
 
                             if (barcodes.isNotEmpty()) {
+                                usedRotation = rotations[0]
                                 if (Logger.isDebugEnabled()) {
                                     Logger.debug("Found ${barcodes.size} barcode(s) in inverted image at rotation ${rotations[0]}")
                                 }
@@ -206,8 +250,11 @@ class BarcodeScanningPlugin(
                                 val invertedTask90: Task<List<Barcode>> = scanner.process(invertedImage90)
                                 barcodes = Tasks.await(invertedTask90)
 
-                                if (barcodes.isNotEmpty() && Logger.isDebugEnabled()) {
-                                    Logger.debug("Found ${barcodes.size} barcode(s) in inverted image at rotation ${rotations[1]}")
+                                if (barcodes.isNotEmpty()) {
+                                    usedRotation = rotations[1]
+                                    if (Logger.isDebugEnabled()) {
+                                        Logger.debug("Found ${barcodes.size} barcode(s) in inverted image at rotation ${rotations[1]}")
+                                    }
                                 }
                             }
                         } finally {
@@ -233,14 +280,23 @@ class BarcodeScanningPlugin(
                     Logger.debug("Barcodes detected: ${barcodes.size} barcode(s)")
                 }
 
+                // Shift ML Kit coordinates from crop space back to the full frame
+                var offsetX = 0
+                var offsetY = 0
+                cropRect?.let { crop ->
+                    val offset = cropOffsetInUpright(crop, rawWidth, rawHeight, usedRotation)
+                    offsetX = offset.first
+                    offsetY = offset.second
+                }
+
                 val result = WritableNativeMap().apply {
-                    putArray("barcodes", processBarcodes(barcodes))
+                    putArray("barcodes", processBarcodes(barcodes, offsetX, offsetY))
                 }
 
                 return result.toHashMap()
             } finally {
-                // Always recycle the cloned bitmap to free memory
-                clonedBitmap.recycle()
+                // Always recycle the working bitmap to free memory
+                workingBitmap.recycle()
             }
 
         } catch (e: Exception) {
@@ -441,6 +497,83 @@ class BarcodeScanningPlugin(
 
     companion object {
         /**
+         * Raw-bitmap crop rect for a scan region defined in the upright frame
+         * (or in a cover-fitted preview view when viewport dims are present).
+         * Returns null when the region resolves to an empty area.
+         */
+        internal fun computeCropRect(
+            region: ScanRegionSpec,
+            rawWidth: Int,
+            rawHeight: Int,
+            rotation: Int
+        ): Rect? {
+            val rot = ((rotation % 360) + 360) % 360
+            val uprightW = (if (rot == 90 || rot == 270) rawHeight else rawWidth).toDouble()
+            val uprightH = (if (rot == 90 || rot == 270) rawWidth else rawHeight).toDouble()
+
+            var l = region.left
+            var t = region.top
+            var r = region.left + region.width
+            var b = region.top + region.height
+
+            val vw = region.viewportWidth
+            val vh = region.viewportHeight
+            if (vw != null && vh != null && vw > 0 && vh > 0) {
+                // Map view-relative → frame-relative through the cover-fit crop
+                val scale = maxOf(vw / uprightW, vh / uprightH)
+                val padX = (uprightW * scale - vw) / 2.0
+                val padY = (uprightH * scale - vh) / 2.0
+                l = (l * vw + padX) / scale / uprightW
+                t = (t * vh + padY) / scale / uprightH
+                r = (r * vw + padX) / scale / uprightW
+                b = (b * vh + padY) / scale / uprightH
+            }
+
+            l = l.coerceIn(0.0, 1.0)
+            t = t.coerceIn(0.0, 1.0)
+            r = r.coerceIn(0.0, 1.0)
+            b = b.coerceIn(0.0, 1.0)
+            if (r <= l || b <= t) {
+                return null
+            }
+
+            // Upright-normalized → raw bitmap space (inverse of the display rotation)
+            val rawL: Double
+            val rawT: Double
+            val rawR: Double
+            val rawB: Double
+            when (rot) {
+                90 -> { rawL = t; rawT = 1.0 - r; rawR = b; rawB = 1.0 - l }
+                180 -> { rawL = 1.0 - r; rawT = 1.0 - b; rawR = 1.0 - l; rawB = 1.0 - t }
+                270 -> { rawL = 1.0 - b; rawT = l; rawR = 1.0 - t; rawB = r }
+                else -> { rawL = l; rawT = t; rawR = r; rawB = b }
+            }
+
+            val left = floor(rawL * rawWidth).toInt().coerceIn(0, rawWidth - 1)
+            val top = floor(rawT * rawHeight).toInt().coerceIn(0, rawHeight - 1)
+            val right = ceil(rawR * rawWidth).toInt().coerceIn(left + 1, rawWidth)
+            val bottom = ceil(rawB * rawHeight).toInt().coerceIn(top + 1, rawHeight)
+            return Rect(left, top, right, bottom)
+        }
+
+        /**
+         * Top-left of the crop rect in the upright space of the given rotation
+         */
+        internal fun cropOffsetInUpright(
+            crop: Rect,
+            rawWidth: Int,
+            rawHeight: Int,
+            rotation: Int
+        ): Pair<Int, Int> {
+            return when (((rotation % 360) + 360) % 360) {
+                90 -> Pair(rawHeight - crop.bottom, crop.left)
+                180 -> Pair(rawWidth - crop.right, rawHeight - crop.bottom)
+                270 -> Pair(crop.top, rawWidth - crop.right)
+                else -> Pair(crop.left, crop.top)
+            }
+        }
+
+        /**
          * Parse barcode format string to ML Kit format constant
          */
         private fun parseBarcodeFormat(format: String): Int? {
@@ -507,9 +640,15 @@ class BarcodeScanningPlugin(
         }
 
         /**
-         * Process barcodes into React Native compatible format
+         * Process barcodes into React Native compatible format.
+         * offsetX/offsetY shift coordinates back to full-frame space when the
+         * image was cropped to a scan region.
          */
-        private fun processBarcodes(barcodes: List<Barcode>): WritableNativeArray {
+        private fun processBarcodes(
+            barcodes: List<Barcode>,
+            offsetX: Int = 0,
+            offsetY: Int = 0
+        ): WritableNativeArray {
             val barcodeArray = WritableNativeArray()
 
             for (barcode in barcodes) {
@@ -520,8 +659,8 @@ class BarcodeScanningPlugin(
                     putString("valueType", valueTypeToString(barcode.valueType))
 
                     // Bounding box and corner points
-                    putMap("frame", processRect(barcode.boundingBox))
-                    putArray("cornerPoints", processCornerPoints(barcode.cornerPoints))
+                    putMap("frame", processRect(barcode.boundingBox, offsetX, offsetY))
+                    putArray("cornerPoints", processCornerPoints(barcode.cornerPoints, offsetX, offsetY))
 
                     // Structured data based on type
                     when (barcode.valueType) {
@@ -660,12 +799,12 @@ class BarcodeScanningPlugin(
         /**
          * Convert Android Rect to React Native format
          */
-        private fun processRect(boundingBox: Rect?): WritableNativeMap {
+        private fun processRect(boundingBox: Rect?, offsetX: Int = 0, offsetY: Int = 0): WritableNativeMap {
             val rectMap = WritableNativeMap()
 
             boundingBox?.let { box ->
-                rectMap.putDouble("x", box.exactCenterX().toDouble())
-                rectMap.putDouble("y", box.exactCenterY().toDouble())
+                rectMap.putDouble("x", box.exactCenterX().toDouble() + offsetX)
+                rectMap.putDouble("y", box.exactCenterY().toDouble() + offsetY)
                 rectMap.putInt("width", box.width())
                 rectMap.putInt("height", box.height())
             }
@@ -676,13 +815,13 @@ class BarcodeScanningPlugin(
         /**
          * Convert Android corner points to React Native format
          */
-        private fun processCornerPoints(cornerPoints: Array<Point>?): WritableNativeArray {
+        private fun processCornerPoints(cornerPoints: Array<Point>?, offsetX: Int = 0, offsetY: Int = 0): WritableNativeArray {
             val pointsArray = WritableNativeArray()
 
             cornerPoints?.forEach { point ->
                 val pointMap = WritableNativeMap().apply {
-                    putInt("x", point.x)
-                    putInt("y", point.y)
+                    putInt("x", point.x + offsetX)
+                    putInt("y", point.y + offsetY)
                 }
                 pointsArray.pushMap(pointMap)
             }
@@ -690,5 +829,40 @@ class BarcodeScanningPlugin(
             return pointsArray
         }
 
+    }
+}
+
+/**
+ * Normalized scan region (0..1) in the upright frame, or in a cover-fitted
+ * preview view when viewport dims are set
+ */
+internal data class ScanRegionSpec(
+    val left: Double,
+    val top: Double,
+    val width: Double,
+    val height: Double,
+    val viewportWidth: Double?,
+    val viewportHeight: Double?
+) {
+    companion object {
+        fun parse(value: Any?): ScanRegionSpec? {
+            val map = value as? Map<*, *> ?: return null
+            val left = (map["left"] as? Number)?.toDouble() ?: return null
+            val top = (map["top"] as? Number)?.toDouble() ?: return null
+            val width = (map["width"] as? Number)?.toDouble() ?: return null
+            val height = (map["height"] as? Number)?.toDouble() ?: return null
+            if (width <= 0.0 || height <= 0.0) {
+                Logger.warn("Invalid scanRegion: width and height must be positive. Got width=$width, height=$height")
+                return null
+            }
+            return ScanRegionSpec(
+                left,
+                top,
+                width,
+                height,
+                (map["viewportWidth"] as? Number)?.toDouble(),
+                (map["viewportHeight"] as? Number)?.toDouble()
+            )
+        }
     }
 }

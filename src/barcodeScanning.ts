@@ -14,12 +14,18 @@ import { useMemo } from 'react';
 import { Logger } from './utils/Logger';
 import type {
   Frame,
+  BarcodeScanCallOptions,
   BarcodeScanningOptions,
   BarcodeScanningPlugin,
   BarcodeScanningResult,
 } from './types';
 
 const PLUGIN_NAME = 'scanBarcode';
+
+// vision-camera does not export ParameterType; derive it for the casts below
+type NativePluginOptions = Parameters<
+  typeof VisionCameraProxy.initFrameProcessorPlugin
+>[1];
 
 const LINKING_ERROR = `Failed to initialize Barcode Scanner plugin. Make sure 'react-native-vision-camera-ml-kit' is properly installed and linked.
 
@@ -62,7 +68,7 @@ export function createBarcodeScannerPlugin(
   // Initialize the frame processor plugin
   const plugin = VisionCameraProxy.initFrameProcessorPlugin(PLUGIN_NAME, {
     ...options,
-  });
+  } as unknown as NativePluginOptions);
 
   if (!plugin) {
     Logger.error('Failed to initialize barcode scanner plugin');
@@ -78,14 +84,34 @@ export function createBarcodeScannerPlugin(
      *
      * @worklet
      * @param frame - The camera frame to process
+     * @param callOptions - Optional per-call options (scanRegion overrides plugin-level)
      * @returns Scanning result with barcodes array, or null if no barcodes found
      */
-    scanBarcode: (frame: Frame): BarcodeScanningResult | null => {
+    scanBarcode: (
+      frame: Frame,
+      callOptions?: BarcodeScanCallOptions
+    ): BarcodeScanningResult | null => {
       'worklet';
       try {
-        const result = plugin.call(
-          frame
-        ) as unknown as BarcodeScanningResult | null;
+        const region = callOptions?.scanRegion;
+        let args: NativePluginOptions | undefined;
+        if (region) {
+          // Worklet closures capture objects as HostObjects; the converter needs a plain one
+          const nativeRegion: Record<string, number> = {
+            left: region.left,
+            top: region.top,
+            width: region.width,
+            height: region.height,
+          };
+          if (region.viewportWidth != null && region.viewportHeight != null) {
+            nativeRegion.viewportWidth = region.viewportWidth;
+            nativeRegion.viewportHeight = region.viewportHeight;
+          }
+          args = { scanRegion: nativeRegion } as unknown as NativePluginOptions;
+        }
+        const result = (args
+          ? plugin.call(frame, args)
+          : plugin.call(frame)) as unknown as BarcodeScanningResult | null;
         return result;
       } catch (e) {
         // Log the error so developers can debug issues
@@ -138,10 +164,21 @@ export function useBarcodeScanner(
   const formats = options?.formats;
   const detectInvertedBarcodes = options?.detectInvertedBarcodes;
   const tryRotations = options?.tryRotations;
+  const scanRegion = options?.scanRegion;
 
   return useMemo(
     () => createBarcodeScannerPlugin(options),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [formats, detectInvertedBarcodes, tryRotations]
+    [
+      formats,
+      detectInvertedBarcodes,
+      tryRotations,
+      scanRegion?.left,
+      scanRegion?.top,
+      scanRegion?.width,
+      scanRegion?.height,
+      scanRegion?.viewportWidth,
+      scanRegion?.viewportHeight,
+    ]
   );
 }
