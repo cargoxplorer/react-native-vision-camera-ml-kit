@@ -261,7 +261,7 @@ const frameProcessor = useFrameProcessor((frame) => {
 ```
 
 All values are normalized fractions (0..1). Detected barcode coordinates stay
-relative to the full frame. Android only for now (iOS pending).
+relative to the full frame. Implemented on both Android and iOS.
 
 #### Static Image Scanning
 
