@@ -302,6 +302,41 @@ describe('createBarcodeScannerPlugin', () => {
     });
   });
 
+  describe('scan region', () => {
+    const region = { left: 0.15, top: 0.3, width: 0.7, height: 0.4 };
+
+    it('should pass scanRegion option to native', () => {
+      createBarcodeScannerPlugin({ scanRegion: region });
+
+      expect(
+        mockVisionCameraProxy.initFrameProcessorPlugin
+      ).toHaveBeenCalledWith('scanBarcode', { scanRegion: region });
+    });
+
+    it('should pass per-call scanRegion with viewport to the native plugin', () => {
+      const plugin = createBarcodeScannerPlugin();
+      const mockFrame = { width: 1920, height: 1080 } as any;
+      const callRegion = { ...region, viewportWidth: 400, viewportHeight: 640 };
+      mockPlugin.call.mockReturnValue(null);
+
+      plugin.scanBarcode(mockFrame, { scanRegion: callRegion });
+
+      expect(mockPlugin.call).toHaveBeenCalledWith(mockFrame, {
+        scanRegion: callRegion,
+      });
+    });
+
+    it('should call native without arguments when no per-call scanRegion', () => {
+      const plugin = createBarcodeScannerPlugin({ scanRegion: region });
+      const mockFrame = { width: 1920, height: 1080 } as any;
+      mockPlugin.call.mockReturnValue(null);
+
+      plugin.scanBarcode(mockFrame);
+
+      expect(mockPlugin.call).toHaveBeenCalledWith(mockFrame);
+    });
+  });
+
   describe('inverted barcode detection', () => {
     it('should pass detectInvertedBarcodes option to native', () => {
       createBarcodeScannerPlugin({

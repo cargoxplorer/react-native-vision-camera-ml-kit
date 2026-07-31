@@ -303,6 +303,30 @@ export interface BarcodeDriverLicense {
 }
 
 /**
+ * Region of interest for barcode scanning: only barcodes inside it are decoded.
+ * Normalized fractions (0..1) of the upright (display-oriented) frame; with
+ * viewportWidth/viewportHeight set, fractions of a cover-fitted preview view of
+ * that aspect ratio instead (pass an overlay rect measured in view coordinates
+ * as-is). Detected barcode coordinates stay relative to the full frame.
+ */
+export interface ScanRegion {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  viewportWidth?: number;
+  viewportHeight?: number;
+}
+
+/**
+ * Per-call options for scanBarcode; scanRegion here overrides the plugin-level
+ * one without recreating the plugin
+ */
+export interface BarcodeScanCallOptions {
+  scanRegion?: ScanRegion;
+}
+
+/**
  * Options for barcode scanning
  */
 export interface BarcodeScanningOptions {
@@ -327,6 +351,12 @@ export interface BarcodeScanningOptions {
    * @default true
    */
   tryRotations?: boolean;
+
+  /**
+   * Restrict decoding to a region of the frame (cropped before ML Kit, so
+   * outside barcodes are never decoded and smaller images decode faster)
+   */
+  scanRegion?: ScanRegion;
 }
 
 /**
@@ -547,8 +577,12 @@ export interface BarcodeScanningPlugin {
   /**
    * Scan barcodes from a camera frame
    * Must be called from a worklet
+   * Optional per-call options (e.g. scanRegion) override plugin-level options
    */
-  scanBarcode: (frame: Frame) => BarcodeScanningResult | null;
+  scanBarcode: (
+    frame: Frame,
+    options?: BarcodeScanCallOptions
+  ) => BarcodeScanningResult | null;
 }
 
 /**

@@ -234,6 +234,35 @@ const { scanBarcode } = useBarcodeScanner({
 }
 ```
 
+#### Scan Region (targeted scanning)
+
+Restrict decoding to a region of the frame — barcodes outside it are ignored
+even if perfectly readable. The frame is cropped before ML Kit processing, so
+smaller regions also decode faster.
+
+```typescript
+// Static region, relative to the upright (display-oriented) frame
+const { scanBarcode } = useBarcodeScanner({
+  scanRegion: { left: 0.15, top: 0.3, width: 0.7, height: 0.4 },
+});
+
+// Region measured in preview-view coordinates (e.g. an overlay viewfinder).
+// Pass the view size and the native side maps it through the cover crop.
+// Per-call regions override the plugin-level one and don't recreate the plugin.
+const frameProcessor = useFrameProcessor((frame) => {
+  'worklet';
+  const result = scanBarcode(frame, {
+    scanRegion: {
+      left: 0.15, top: 0.325, width: 0.7, height: 0.35,
+      viewportWidth: 400, viewportHeight: 800,
+    },
+  });
+}, [scanBarcode]);
+```
+
+All values are normalized fractions (0..1). Detected barcode coordinates stay
+relative to the full frame. Android only for now (iOS pending).
+
 #### Static Image Scanning
 
 ```typescript

@@ -103,6 +103,39 @@ describe('useBarcodeScanner', () => {
     ).toHaveBeenCalledTimes(2);
   });
 
+  it('should memoize plugin for equal scanRegion values across renders', () => {
+    useBarcodeScanner({
+      scanRegion: { left: 0.1, top: 0.1, width: 0.8, height: 0.8 },
+    });
+    // New object, same values — must not recreate the plugin
+    useBarcodeScanner({
+      scanRegion: { left: 0.1, top: 0.1, width: 0.8, height: 0.8 },
+    });
+
+    expect(
+      mockVisionCameraProxy.initFrameProcessorPlugin
+    ).toHaveBeenCalledTimes(1);
+  });
+
+  it('should recreate plugin when scanRegion changes', () => {
+    useBarcodeScanner({
+      scanRegion: { left: 0.1, top: 0.1, width: 0.8, height: 0.8 },
+    });
+    expect(
+      mockVisionCameraProxy.initFrameProcessorPlugin
+    ).toHaveBeenCalledTimes(1);
+
+    // Reset memoization
+    mockMemoState.mockLastDeps = [];
+
+    useBarcodeScanner({
+      scanRegion: { left: 0.2, top: 0.2, width: 0.6, height: 0.6 },
+    });
+    expect(
+      mockVisionCameraProxy.initFrameProcessorPlugin
+    ).toHaveBeenCalledTimes(2);
+  });
+
   it('should recreate plugin when detectInvertedBarcodes changes', () => {
     const options1 = { detectInvertedBarcodes: false };
     const options2 = { detectInvertedBarcodes: true };
