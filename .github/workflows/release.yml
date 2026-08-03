@@ -74,7 +74,7 @@ jobs:
 
       - name: Release (no version bump)
         if: github.event_name == 'workflow_dispatch' && !github.event.inputs.version
-        run: npm run release -- --increment=0
+        run: npm run release -- --no-increment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
