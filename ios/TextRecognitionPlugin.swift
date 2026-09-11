@@ -17,6 +17,8 @@ import MLKitTextRecognitionKorean
 public class TextRecognitionPlugin: FrameProcessorPlugin {
 
     private var textRecognizer: TextRecognizer!
+    private var textLayout: TextLayout = .horizontal
+    private lazy var stackedReader = StackedTextReader()
 
     public override init(proxy: VisionCameraProxyHolder, options: [AnyHashable: Any]! = [:]) {
         super.init(proxy: proxy, options: options)
@@ -40,7 +42,8 @@ public class TextRecognitionPlugin: FrameProcessorPlugin {
             textRecognizer = TextRecognizer.textRecognizer(options: TextRecognizerOptions())
         }
 
-        Logger.info("Text recognition initialized successfully")
+        textLayout = TextLayout.from(options["textLayout"])
+        Logger.info("Text recognition initialized successfully (textLayout: \(textLayout.rawValue))")
     }
 
     deinit {
@@ -58,30 +61,47 @@ public class TextRecognitionPlugin: FrameProcessorPlugin {
 
             // Clone the camera buffer to UIImage to release the original buffer immediately
             // This prevents buffer exhaustion issues when ML Kit processing takes longer than camera frame rate
-            guard let visionImage = ImageUtils.visionImageFromSampleBuffer(frame.buffer) else {
+            guard let clonedImage = ImageUtils.imageFromSampleBuffer(frame.buffer) else {
                 Logger.error("Failed to create vision image from sample buffer")
                 return nil
             }
-            visionImage.orientation = getOrientation(orientation: orientation)
+            let visionImage = VisionImage(image: clonedImage)
+            let imageOrientation = getOrientation(orientation: orientation)
+            visionImage.orientation = imageOrientation
 
             Logger.debug("Processing frame: \(frame.width)x\(frame.height), orientation: \(orientation.rawValue)")
 
             // Process synchronously
             let text = try textRecognizer.results(in: visionImage)
 
+            // Runs on an upright copy; frames are mapped back into the buffer's coordinates.
+            let stackedBlocks: [StackedTextReader.StackedBlock]
+            if textLayout.shouldReadStacked(text) {
+                let degrees = TextRecognitionPlugin.rotationDegrees(for: imageOrientation)
+                let upright = StackedTextReader.rotatedCopy(clonedImage, degrees: degrees)
+                stackedBlocks = stackedReader
+                    .read(upright, recognizer: textRecognizer)
+                    .map { StackedTextReader.toSourceCoordinates($0, degrees: degrees, rotatedSize: upright.size) }
+            } else {
+                stackedBlocks = []
+            }
+
             let processingTime = Int64(Date().timeIntervalSince(startTime) * 1000)
             Logger.performance("Text recognition processing", durationMs: processingTime)
 
-            if text.text.isEmpty {
+            if text.text.isEmpty && stackedBlocks.isEmpty {
                 Logger.debug("No text detected in frame")
                 return nil
             }
 
-            Logger.debug("Text detected: \(text.text.count) characters, \(text.blocks.count) blocks")
+            Logger.debug("Text detected: \(text.text.count) characters, \(text.blocks.count) blocks, \(stackedBlocks.count) stacked")
+
+            var blocks = processBlocks(text.blocks)
+            blocks.append(contentsOf: stackedBlocks.map { StackedTextBlocks.toDictionary($0) })
 
             return [
-                "text": text.text,
-                "blocks": processBlocks(text.blocks)
+                "text": StackedTextBlocks.combineText(text.text, stackedBlocks),
+                "blocks": blocks
             ]
 
         } catch {
@@ -106,6 +126,15 @@ public class TextRecognitionPlugin: FrameProcessorPlugin {
             return .left   // Swap left and right
         default:
             return .up
+        }
+    }
+
+    private static func rotationDegrees(for orientation: UIImage.Orientation) -> Int {
+        switch orientation {
+        case .right: return 90
+        case .down: return 180
+        case .left: return 270
+        default: return 0
         }
     }
 

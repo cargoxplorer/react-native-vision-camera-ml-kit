@@ -8,6 +8,7 @@ React Native Vision Camera frame processor plugin for Google ML Kit integration.
 ## Features
 
 - 📝 **Text Recognition v2** - On-device OCR with 5 script support (Latin, Chinese, Devanagari, Japanese, Korean)
+- 🔡 **Vertical (stacked) text** - Reads columns of upright characters, such as container numbers painted on a door, that ML Kit cannot read on its own
 - 📊 **Barcode Scanning** - Supports all 1D and 2D formats with structured data extraction (WiFi, Contact, URL, etc.)
 - 📄 **Document Scanner** - Professional document digitization with ML-powered cleaning (Android only)
 - ⚡ **High Performance** - Optimized for 60fps real-time processing
@@ -42,6 +43,8 @@ React Native Vision Camera frame processor plugin for Google ML Kit integration.
 - **License Plate Scanning** - Real-time vehicle tracking for parking lots, toll gates, and warehouse entry/exit. Use bounding boxes for precise plate location and confidence scores for validation.
 
 - **Multilingual Product Labels** - Read ingredient lists, instructions, and product information in 5 language scripts (Latin, Chinese, Japanese, Korean, Devanagari). Perfect for international retail and e-commerce applications.
+
+- **Shipping Container Numbers** - Read the ISO 6346 identifier painted down a container door as a vertical stack of upright characters. Set `textLayout: 'auto'` and the library detects the column and reads it as an ordinary line; see [Vertical (stacked) text](#vertical-stacked-text).
 
 ## Installation
 
@@ -191,6 +194,34 @@ const result = await captureAndRecognizeText(cameraRef.current, {
   flash: 'auto',
 });
 ```
+
+#### Vertical (stacked) text
+
+Container numbers are painted down the door as a column of upright characters, which ML Kit
+cannot read ([googlesamples/mlkit#254](https://github.com/googlesamples/mlkit/issues/254)).
+`textLayout` makes the library find the column itself, re-lay the glyphs as a horizontal strip
+and read that with ML Kit. Offline, no custom model.
+
+```typescript
+const { scanText } = useTextRecognition({ language: 'latin', textLayout: 'auto' });
+const result = await recognizeTextFromImage({ uri, textLayout: 'stacked' });
+```
+
+| Value | Behaviour |
+|-------|-----------|
+| `horizontal` *(default)* | Unchanged ML Kit pass. |
+| `stacked` | Normal pass plus the stacked pass on every frame. |
+| `auto` | Stacked pass only when the horizontal pass found no lines. A container door always carries horizontal labels, so use `stacked` for container numbers. |
+
+A detected column is appended to `blocks` as one `TextBlock` with `stacked: true` and a single
+line. Its `text` is what ML Kit read from the strip (e.g. `CA AU9314819`); `frame` and element
+frames are in the coordinates of the original image, one element per glyph. `result.text` gets
+the column on its own line.
+
+Limits: Latin only; assumes bright-on-dark or dark-on-light paint; a column needs 8+ glyphs of
+roughly 10 px height at a 1200 px working size. Detection costs ~90 ms per frame under
+`stacked`, so throttle with `runAtTargetFps`. Still images retry at 90/270/180 degrees when the
+upright pass finds nothing.
 
 ---
 
@@ -431,6 +462,7 @@ try {
 | Feature | Android | iOS |
 |---------|---------|-----|
 | Text Recognition v2 | ✅ | ✅ |
+| Vertical (stacked) text | ✅ | ✅ |
 | Barcode Scanning | ✅ | ✅ |
 | Document Scanner | ✅ | ❌* |
 

@@ -95,6 +95,7 @@ export async function captureAndRecognizeText(
     const result = await recognizeTextFromImage({
       uri: `file://${photo.path}`,
       language: options.language,
+      textLayout: options.textLayout,
       orientation: 0, // Photos are typically auto-rotated
     });
 

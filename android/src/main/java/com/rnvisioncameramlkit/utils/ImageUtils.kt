@@ -1,9 +1,13 @@
 package com.rnvisioncameramlkit.utils
 
+import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.media.Image
+import android.net.Uri
+import androidx.exifinterface.media.ExifInterface
 
 /**
  * Utility class for efficient image cloning and conversion.
@@ -129,6 +133,42 @@ object ImageUtils {
 
         return bitmap
     }
+
+    // Decodes to an upright bitmap (EXIF applied), matching InputImage.fromFilePath coordinates.
+    fun decodeBitmap(context: Context, uri: Uri, extraRotationDegrees: Int = 0): Bitmap? {
+        return try {
+            val decoded = context.contentResolver.openInputStream(uri).use { stream ->
+                if (stream == null) null else BitmapFactory.decodeStream(stream)
+            } ?: return null
+
+            val exifDegrees = context.contentResolver.openInputStream(uri).use { stream ->
+                if (stream == null) 0 else exifRotation(ExifInterface(stream))
+            }
+
+            rotate(decoded, exifDegrees + extraRotationDegrees)
+        } catch (e: Exception) {
+            Logger.error("Failed to decode bitmap from $uri", e)
+            null
+        }
+    }
+
+    // Recycles the input when a new bitmap is produced.
+    fun rotate(bitmap: Bitmap, degrees: Int): Bitmap {
+        val normalized = ((degrees % 360) + 360) % 360
+        if (normalized == 0) return bitmap
+        val matrix = Matrix().apply { postRotate(normalized.toFloat()) }
+        val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        if (rotated !== bitmap) bitmap.recycle()
+        return rotated
+    }
+
+    private fun exifRotation(exif: ExifInterface): Int =
+        when (exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270
+            else -> 0
+        }
 
     /**
      * Clear thread-local buffers to free memory.

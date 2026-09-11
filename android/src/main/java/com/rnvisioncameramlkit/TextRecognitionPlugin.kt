@@ -1,5 +1,6 @@
 package com.rnvisioncameramlkit
 
+import android.graphics.Bitmap
 import android.graphics.Point
 import android.graphics.Rect
 import android.media.Image
@@ -20,6 +21,9 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.mrousavy.camera.frameprocessors.Frame
 import com.mrousavy.camera.frameprocessors.FrameProcessorPlugin
 import com.mrousavy.camera.frameprocessors.VisionCameraProxy
+import com.rnvisioncameramlkit.stacked.StackedTextBlocks
+import com.rnvisioncameramlkit.stacked.StackedTextReader
+import com.rnvisioncameramlkit.stacked.TextLayout
 import com.rnvisioncameramlkit.utils.ImageUtils
 import com.rnvisioncameramlkit.utils.Logger
 
@@ -35,6 +39,8 @@ class TextRecognitionPlugin(
 ) : FrameProcessorPlugin(), AutoCloseable {
 
     private var recognizer: TextRecognizer
+    private val textLayout: TextLayout
+    private val stackedReader: StackedTextReader by lazy { StackedTextReader() }
 
     init {
         val language = options?.get("language")?.toString() ?: "latin"
@@ -53,7 +59,8 @@ class TextRecognitionPlugin(
         }
 
         recognizer = TextRecognition.getClient(recognizerOptions)
-        Logger.info("Text recognition initialized successfully")
+        textLayout = TextLayout.from(options?.get("textLayout")?.toString())
+        Logger.info("Text recognition initialized successfully (textLayout: $textLayout)")
     }
 
     /**
@@ -106,19 +113,28 @@ class TextRecognitionPlugin(
                 val task: Task<Text> = recognizer.process(image)
                 val text: Text = Tasks.await(task)
 
+                val stackedBlocks = if (textLayout.shouldReadStacked(text)) {
+                    readStackedColumns(clonedBitmap, rotationDegrees)
+                } else {
+                    emptyList()
+                }
+
                 val processingTime = System.currentTimeMillis() - startTime
                 Logger.performance("Text recognition processing", processingTime)
 
-                if (text.text.isEmpty()) {
+                if (text.text.isEmpty() && stackedBlocks.isEmpty()) {
                     Logger.debug("No text detected in frame")
                     return null
                 }
 
-                Logger.debug("Text detected: ${text.text.length} characters, ${text.textBlocks.size} blocks")
+                Logger.debug("Text detected: ${text.text.length} characters, ${text.textBlocks.size} blocks, ${stackedBlocks.size} stacked")
+
+                val blocks = processBlocks(text.textBlocks)
+                stackedBlocks.forEach { blocks.pushMap(StackedTextBlocks.toMap(it)) }
 
                 val result = WritableNativeMap().apply {
-                    putString("text", text.text)
-                    putArray("blocks", processBlocks(text.textBlocks))
+                    putString("text", StackedTextBlocks.combineText(text.text, stackedBlocks))
+                    putArray("blocks", blocks)
                 }
 
                 return result.toHashMap()
@@ -135,7 +151,25 @@ class TextRecognitionPlugin(
         }
     }
 
+    // The detector needs upright glyphs, so the pixels are rotated rather than tagged.
+    private fun readStackedColumns(
+        clonedBitmap: Bitmap,
+        rotationDegrees: Int
+    ): List<StackedTextReader.StackedBlock> {
+        val upright = StackedTextReader.rotatedCopy(clonedBitmap, rotationDegrees)
+        return try {
+            stackedReader.read(upright, recognizer, STACKED_TIMEOUT_SECONDS)
+        } catch (e: Exception) {
+            Logger.error("Stacked text pass failed", e)
+            emptyList()
+        } finally {
+            if (upright !== clonedBitmap) upright.recycle()
+        }
+    }
+
     companion object {
+        private const val STACKED_TIMEOUT_SECONDS = 5L
+
         /**
          * Process text blocks into React Native compatible format
          */

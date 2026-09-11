@@ -49,6 +49,9 @@ export enum TextRecognitionScript {
   KOREAN = 'korean',
 }
 
+/** `stacked` also reads columns of upright characters; `auto` does so only when nothing else was found */
+export type TextLayout = 'horizontal' | 'stacked' | 'auto';
+
 /**
  * Options for text recognition
  */
@@ -58,6 +61,12 @@ export interface TextRecognitionOptions {
    * @default 'latin'
    */
   language?: TextRecognitionScript | string;
+
+  /**
+   * Layout of the text to recognize (Latin only for stacked columns)
+   * @default 'horizontal'
+   */
+  textLayout?: TextLayout;
 }
 
 /**
@@ -188,6 +197,11 @@ export interface TextBlock {
    * Detected language code (e.g., 'en', 'zh')
    */
   recognizedLanguage?: string;
+
+  /**
+   * True for a column synthesized by the stacked pass; frames are in original image coordinates
+   */
+  stacked?: boolean;
 }
 
 /**
