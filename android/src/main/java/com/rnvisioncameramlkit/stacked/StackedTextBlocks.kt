@@ -4,7 +4,6 @@ import android.graphics.Rect
 import com.facebook.react.bridge.WritableNativeArray
 import com.facebook.react.bridge.WritableNativeMap
 
-// Serializes a stacked column in the same shape as ML Kit blocks, plus `stacked: true`.
 object StackedTextBlocks {
 
     fun toMap(block: StackedTextReader.StackedBlock): WritableNativeMap {

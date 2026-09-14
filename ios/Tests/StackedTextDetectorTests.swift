@@ -48,8 +48,12 @@ final class StackedTextDetectorTests: XCTestCase {
             }
         }
 
-        func detect() -> [StackedTextDetector.Column] {
-            StackedTextDetector.detect(rgba: rgba, width: width, height: height)
+        func detect(_ workspace: StackedTextDetector.Workspace = StackedTextDetector.Workspace()) -> [StackedTextDetector.Column] {
+            StackedTextDetector.detect(rgba: rgba, width: width, height: height, workspace: workspace)
+        }
+
+        func luma() -> [UInt8] {
+            (0..<(width * height)).map { rgba[$0 * 4] }
         }
     }
 
@@ -120,5 +124,39 @@ final class StackedTextDetectorTests: XCTestCase {
             row.fill(5 + i * 22, 300, glyphWidth, glyphHeight, whitePaint)
         }
         XCTAssertTrue(row.detect().isEmpty)
+    }
+
+    func testDropsOutliersAtTheColumnEnds() throws {
+        var image = Image(width: width, height: height, background: darkBackground)
+        paintColumn(&image, centerX: 120, value: whitePaint)
+        let below = firstGlyphTop + containerNumberLength * glyphPitch
+        image.fill(117, below, 6, 6, whitePaint)
+        image.fill(117, below + 12, 6, 6, whitePaint)
+
+        let column = try XCTUnwrap(image.detect().first)
+        let refined = StackedTextDetector.refine(column)
+
+        XCTAssertEqual(column.glyphs.count, containerNumberLength + 2)
+        XCTAssertEqual(refined.glyphs.count, containerNumberLength)
+        XCTAssertEqual(refined.glyphs, Array(column.glyphs.prefix(containerNumberLength)))
+    }
+
+    func testKeepsANarrowLastGlyph() throws {
+        var image = Image(width: width, height: height, background: darkBackground)
+        paintColumn(&image, centerX: 120, value: whitePaint, count: containerNumberLength - 1)
+        image.fill(117, firstGlyphTop + (containerNumberLength - 1) * glyphPitch, 6, glyphHeight, whitePaint)
+
+        let column = try XCTUnwrap(image.detect().first)
+
+        XCTAssertEqual(column.glyphs.count, containerNumberLength)
+        XCTAssertEqual(StackedTextDetector.refine(column).glyphs.count, containerNumberLength)
+    }
+
+    func testLumaPathEqualsRGBAPath() {
+        var image = Image(width: width, height: height, background: darkBackground)
+        paintColumn(&image, centerX: 70, value: whitePaint)
+        paintColumn(&image, centerX: 180, value: 200)
+
+        XCTAssertEqual(image.detect(), StackedTextDetector.detect(luma: image.luma(), width: width, height: height))
     }
 }

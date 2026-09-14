@@ -219,9 +219,17 @@ frames are in the coordinates of the original image, one element per glyph. `res
 the column on its own line.
 
 Limits: Latin only; assumes bright-on-dark or dark-on-light paint; a column needs 8+ glyphs of
-roughly 10 px height at a 1200 px working size. Detection costs ~90 ms per frame under
-`stacked`, so throttle with `runAtTargetFps`. Still images retry at 90/270/180 degrees when the
-upright pass finds nothing.
+roughly 12 px height in a 1080p frame (still images are searched at a 1200 px long side). On
+camera frames the column search reads the luma plane directly and runs alongside the horizontal
+ML Kit pass; candidate columns are ranked and at most six go through ML Kit (~50 ms each), so
+`stacked` typically adds one strip recognition on top of the horizontal pass. Throttle with
+`runAtTargetFps` or use `async`. Still images retry at 90/270/180 degrees when the upright pass
+finds nothing.
+
+`async: true` (frame processor only) copies the frame, returns immediately and recognizes on a
+background thread; the next call that finds a finished result returns it, so poll at 2-3 fps.
+The camera buffer is held for the copy only (~15 ms), which keeps the preview smooth while ML
+Kit runs.
 
 ---
 

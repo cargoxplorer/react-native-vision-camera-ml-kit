@@ -79,7 +79,6 @@ class StaticTextRecognitionModule(reactContext: ReactApplicationContext) :
 
             val recognizer: TextRecognizer = TextRecognition.getClient(recognizerOptions)
 
-            // The stacked pass and the orientation option both need the pixels.
             val parsedUri = resolvedUri(uri)
             val needsBitmap = textLayout != TextLayout.HORIZONTAL || orientation != 0
             var bitmap: Bitmap? = null

@@ -9,7 +9,6 @@ import CoreGraphics
 import MLKitVision
 import MLKitTextRecognition
 
-// Re-lays a detected column as a horizontal strip, reads it with ML Kit and maps frames back.
 final class StackedTextReader {
 
     struct GlyphReading {
@@ -23,14 +22,21 @@ final class StackedTextReader {
         let glyphs: [GlyphReading]
     }
 
-    static let detectionLongSide = 1200
+    struct Prepared {
+        let strip: UIImage
+        let bounds: CGRect
+        let glyphBoxes: [CGRect]
+        let widths: [Int]
+    }
+
+    static let frameDetectionLongSide = 1920
+    static let staticDetectionLongSide = 1200
+    static let maxColumnsToRead = 6
     private static let tileHeight = 96
     private static let tileGap = 24
     private static let minTileWidth = 8
     private static let glyphPadding = 0.20
-    private static let mergedHeightRatio = 1.7
-    private static let boxedWidthRatio = 1.35
-    private static let boxedHeightRatio = 1.12
+    private static let colourSamples = 24
     private static let rotationSweep = [0, 90, 270, 180]
 
     private let workspace = StackedTextDetector.Workspace()
@@ -41,7 +47,8 @@ final class StackedTextReader {
         let sourceHeight = source.height
         guard sourceWidth >= 2, sourceHeight >= 2 else { return [] }
 
-        let scale = min(1.0, Double(Self.detectionLongSide) / Double(max(sourceWidth, sourceHeight)))
+        let started = Date()
+        let scale = min(1.0, Double(Self.staticDetectionLongSide) / Double(max(sourceWidth, sourceHeight)))
         let detectionWidth = max(1, Int((Double(sourceWidth) * scale).rounded()))
         let detectionHeight = max(1, Int((Double(sourceHeight) * scale).rounded()))
 
@@ -50,29 +57,14 @@ final class StackedTextReader {
             return []
         }
 
-        let columns = StackedTextDetector.detect(
-            rgba: rgba,
-            width: detectionWidth,
-            height: detectionHeight,
-            workspace: workspace
-        )
-        if columns.isEmpty { return [] }
+        let columns = StackedTextDetector.detect(rgba: rgba, width: detectionWidth, height: detectionHeight, workspace: workspace)
+        Logger.performance("stacked.detect", durationMs: Int64(Date().timeIntervalSince(started) * 1000))
+        Logger.debug("stacked.columns=\(columns.count) \(columns.map { $0.glyphs.count }) in \(detectionWidth)x\(detectionHeight)")
 
-        let inverse = 1.0 / scale
-        return columns.compactMap { column in
-            readColumn(
-                column,
-                source: source,
-                inverse: inverse,
-                detectionPixels: rgba,
-                detectionWidth: detectionWidth,
-                detectionHeight: detectionHeight,
-                recognizer: recognizer
-            )
-        }
+        let prepared = prepare(columns, inverse: 1.0 / scale, source: source, rotationDegrees: 0, uprightWidth: sourceWidth, uprightHeight: sourceHeight)
+        return recognize(prepared, recognizer: recognizer)
     }
 
-    // Orientation metadata does not affect the Latin recognizer, so pixels are rotated.
     func readWithRotationFallback(_ image: UIImage, recognizer: TextRecognizer) -> [StackedBlock] {
         for degrees in Self.rotationSweep {
             let rotated = Self.rotatedCopy(image, degrees: degrees)
@@ -85,31 +77,66 @@ final class StackedTextReader {
         return []
     }
 
-    private func readColumn(
-        _ column: StackedTextDetector.Column,
-        source: CGImage,
+    func prepare(luma: ImageUtils.LumaPlane, source: CGImage, rotationDegrees: Int) -> [Prepared] {
+        let started = Date()
+        let columns = StackedTextDetector.detect(luma: luma.bytes, width: luma.width, height: luma.height, workspace: workspace)
+        Logger.performance("stacked.detect", durationMs: Int64(Date().timeIntervalSince(started) * 1000))
+        Logger.debug("stacked.columns=\(columns.count) \(columns.map { $0.glyphs.count }) in \(luma.width)x\(luma.height), passes=\(workspace.passesRun)")
+
+        let upright = rotationDegrees % 180 == 0
+        let uprightWidth = upright ? source.width : source.height
+        let uprightHeight = upright ? source.height : source.width
+        return prepare(columns, inverse: Double(luma.step), source: source, rotationDegrees: rotationDegrees, uprightWidth: uprightWidth, uprightHeight: uprightHeight)
+    }
+
+    func recognize(_ prepared: [Prepared], recognizer: TextRecognizer) -> [StackedBlock] {
+        prepared.compactMap { readStrip($0, recognizer: recognizer) }
+    }
+
+    private func prepare(
+        _ columns: [StackedTextDetector.Column],
         inverse: Double,
-        detectionPixels: [UInt8],
-        detectionWidth: Int,
-        detectionHeight: Int,
-        recognizer: TextRecognizer
-    ) -> StackedBlock? {
-        let (glyphs, boxed) = Self.refineGlyphs(column.glyphs)
-        let glyphBoxes = glyphs.map { Self.toSourceRect($0, inverse: inverse, source: source) }
-        let tiles = glyphBoxes.indices.map { Self.padded(glyphBoxes, index: $0, boxed: boxed.contains($0), source: source) }
-        let widths = tiles.map { tile -> Int in
-            max(Self.minTileWidth, Int((tile.width * CGFloat(Self.tileHeight) / tile.height).rounded()))
+        source: CGImage,
+        rotationDegrees: Int,
+        uprightWidth: Int,
+        uprightHeight: Int
+    ) -> [Prepared] {
+        if columns.isEmpty { return [] }
+        let started = Date()
+        let ranked = columns
+            .map { ($0, StackedTextDetector.refine($0)) }
+            .sorted { $0.1.score < $1.1.score }
+            .prefix(Self.maxColumnsToRead)
+
+        var prepared = [Prepared]()
+        for (column, refined) in ranked {
+            let glyphBoxes = refined.glyphs.map { Self.toSourceRect($0, inverse: inverse, width: uprightWidth, height: uprightHeight) }
+            let tiles = glyphBoxes.indices.map {
+                Self.padded(glyphBoxes, index: $0, boxed: refined.boxed[$0], width: uprightWidth, height: uprightHeight)
+            }
+            let widths = tiles.map { tile -> Int in
+                max(Self.minTileWidth, Int((tile.width * CGFloat(Self.tileHeight) / tile.height).rounded()))
+            }
+            let region = tiles.dropFirst().reduce(tiles[0]) { $0.union($1) }.integral
+
+            guard let crop = Self.uprightCrop(source, region: region, rotationDegrees: rotationDegrees, uprightWidth: uprightWidth, uprightHeight: uprightHeight) else {
+                continue
+            }
+            let strip = Self.buildStrip(crop: crop, tiles: tiles, offset: region.origin, widths: widths, background: Self.medianColour(crop))
+            prepared.append(Prepared(
+                strip: strip,
+                bounds: Self.toSourceRect(column.bounds, inverse: inverse, width: uprightWidth, height: uprightHeight),
+                glyphBoxes: glyphBoxes,
+                widths: widths
+            ))
         }
+        Logger.performance("stacked.strip.build", durationMs: Int64(Date().timeIntervalSince(started) * 1000))
+        return prepared
+    }
 
-        let background = Self.medianColour(
-            column.bounds,
-            pixels: detectionPixels,
-            width: detectionWidth,
-            height: detectionHeight
-        )
-        let strip = Self.buildStrip(source: source, tiles: tiles, widths: widths, background: background)
-
-        let visionImage = VisionImage(image: strip)
+    private func readStrip(_ prepared: Prepared, recognizer: TextRecognizer) -> StackedBlock? {
+        let started = Date()
+        let visionImage = VisionImage(image: prepared.strip)
         visionImage.orientation = .up
 
         let text: Text
@@ -119,22 +146,39 @@ final class StackedTextReader {
             Logger.error("Stacked strip recognition failed: \(error.localizedDescription)")
             return nil
         }
+        Logger.performance("stacked.strip.mlkit", durationMs: Int64(Date().timeIntervalSince(started) * 1000))
 
         let lines = text.blocks.flatMap { $0.lines }.sorted { $0.frame.minX < $1.frame.minX }
         let reading = lines.map { $0.text }.joined(separator: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        Logger.debug("Stacked strip read: '\(reading)'")
         if reading.isEmpty { return nil }
 
         return StackedBlock(
             text: reading,
-            bounds: Self.toSourceRect(column.bounds, inverse: inverse, source: source),
-            glyphs: Self.assignGlyphText(text, glyphBoxes: glyphBoxes, widths: widths)
+            bounds: prepared.bounds,
+            glyphs: Self.assignGlyphText(text, glyphBoxes: prepared.glyphBoxes, widths: prepared.widths)
         )
     }
 
+    private static func uprightCrop(
+        _ source: CGImage,
+        region: CGRect,
+        rotationDegrees: Int,
+        uprightWidth: Int,
+        uprightHeight: Int
+    ) -> CGImage? {
+        let rotatedSize = CGSize(width: uprightWidth, height: uprightHeight)
+        let inSource = toSourceCoordinates(region, degrees: rotationDegrees, rotatedSize: rotatedSize)
+        guard let cropped = source.cropping(to: inSource) else { return nil }
+        if rotationDegrees % 360 == 0 { return cropped }
+        return rotatedCopy(UIImage(cgImage: cropped), degrees: rotationDegrees).cgImage
+    }
+
     private static func buildStrip(
-        source: CGImage,
+        crop: CGImage,
         tiles: [CGRect],
+        offset: CGPoint,
         widths: [Int],
         background: UIColor
     ) -> UIImage {
@@ -152,7 +196,8 @@ final class StackedTextReader {
 
             var x = CGFloat(tileGap)
             for index in tiles.indices {
-                guard let cropped = source.cropping(to: tiles[index]) else {
+                let tile = tiles[index].offsetBy(dx: -offset.x, dy: -offset.y)
+                guard let cropped = crop.cropping(to: tile) else {
                     x += CGFloat(widths[index] + tileGap)
                     continue
                 }
@@ -168,7 +213,6 @@ final class StackedTextReader {
         }
     }
 
-    // iOS ML Kit stops at elements, so an element's characters are spread evenly over its width.
     private static func assignGlyphText(
         _ text: Text,
         glyphBoxes: [CGRect],
@@ -223,55 +267,18 @@ final class StackedTextReader {
         return drawn ? buffer : nil
     }
 
-    // Two characters stuck together become one tall glyph; the check-digit frame merges with its digit.
-    private static func refineGlyphs(_ detected: [StackedTextDetector.Box]) -> ([StackedTextDetector.Box], Set<Int>) {
-        let medianWidth = detected.map { $0.width }.sorted()[detected.count / 2]
-        let medianHeight = detected.map { $0.height }.sorted()[detected.count / 2]
-        let glyphs = detected.flatMap { g -> [StackedTextDetector.Box] in
-            let parts = Int((Double(g.height) / Double(medianHeight)).rounded())
-            guard parts >= 2, Double(g.height) > Double(medianHeight) * mergedHeightRatio else { return [g] }
-            let step = Double(g.height) / Double(parts)
-            return (0..<parts).map { k in
-                StackedTextDetector.Box(
-                    left: g.left,
-                    top: g.top + Int(Double(k) * step),
-                    right: g.right,
-                    bottom: g.top + Int(Double(k + 1) * step)
-                )
-            }
-        }
-        var boxed = Set<Int>()
-        let refined = glyphs.enumerated().map { index, g -> StackedTextDetector.Box in
-            guard Double(g.width) > Double(medianWidth) * boxedWidthRatio,
-                  Double(g.height) > Double(medianHeight) * boxedHeightRatio else { return g }
-            boxed.insert(index)
-            let dx = (g.width - medianWidth) / 2
-            let dy = (g.height - medianHeight) / 2
-            return StackedTextDetector.Box(left: g.left + dx, top: g.top + dy, right: g.right - dx, bottom: g.bottom - dy)
-        }
-        return (refined, boxed)
-    }
+    private static func medianColour(_ crop: CGImage) -> UIColor {
+        let width = crop.width
+        let height = crop.height
+        guard width > 0, height > 0, let pixels = rgbaBuffer(crop, width: width, height: height) else { return .black }
 
-    // Median rather than mean: the door dominates the area, the paint must not lighten the background.
-    private static func medianColour(
-        _ bounds: StackedTextDetector.Box,
-        pixels: [UInt8],
-        width: Int,
-        height: Int
-    ) -> UIColor {
-        let left = max(0, bounds.left)
-        let top = max(0, bounds.top)
-        let right = min(width, bounds.right)
-        let bottom = min(height, bounds.bottom)
-        guard right > left, bottom > top else { return .black }
-
-        let stepX = max(1, (right - left) / 24)
-        let stepY = max(1, (bottom - top) / 24)
+        let stepX = max(1, width / colourSamples)
+        let stepY = max(1, height / colourSamples)
         var reds = [Int](), greens = [Int](), blues = [Int]()
-        var y = top
-        while y < bottom {
-            var x = left
-            while x < right {
+        var y = 0
+        while y < height {
+            var x = 0
+            while x < width {
                 let base = (y * width + x) * 4
                 reds.append(Int(pixels[base]))
                 greens.append(Int(pixels[base + 1]))
@@ -293,30 +300,29 @@ final class StackedTextReader {
     private static func toSourceRect(
         _ box: StackedTextDetector.Box,
         inverse: Double,
-        source: CGImage
+        width: Int,
+        height: Int
     ) -> CGRect {
-        let left = min(max(0, (Double(box.left) * inverse).rounded()), Double(source.width - 1))
-        let top = min(max(0, (Double(box.top) * inverse).rounded()), Double(source.height - 1))
-        let right = min(max(left + 1, (Double(box.right) * inverse).rounded()), Double(source.width))
-        let bottom = min(max(top + 1, (Double(box.bottom) * inverse).rounded()), Double(source.height))
+        let left = min(max(0, (Double(box.left) * inverse).rounded()), Double(width - 1))
+        let top = min(max(0, (Double(box.top) * inverse).rounded()), Double(height - 1))
+        let right = min(max(left + 1, (Double(box.right) * inverse).rounded()), Double(width))
+        let bottom = min(max(top + 1, (Double(box.bottom) * inverse).rounded()), Double(height))
         return CGRect(x: left, y: top, width: right - left, height: bottom - top)
     }
 
-    // Vertical padding stops halfway to the neighbouring glyph; a boxed digit gets none, or its frame returns.
-    private static func padded(_ all: [CGRect], index: Int, boxed: Bool, source: CGImage) -> CGRect {
+    private static func padded(_ all: [CGRect], index: Int, boxed: Bool, width: Int, height: Int) -> CGRect {
         let box = all[index]
         let pad = boxed ? 0 : (box.height * CGFloat(glyphPadding)).rounded()
         let gapUp = index > 0 ? box.minY - all[index - 1].maxY : pad * 2
         let gapDown = index + 1 < all.count ? all[index + 1].minY - box.maxY : pad * 2
         let padY = min(pad, max(0, gapUp / 2), max(0, gapDown / 2)).rounded(.down)
-        let left = min(max(0, box.minX - pad), CGFloat(source.width - 1))
-        let top = min(max(0, box.minY - padY), CGFloat(source.height - 1))
-        let right = min(max(left + 1, box.maxX + pad), CGFloat(source.width))
-        let bottom = min(max(top + 1, box.maxY + padY), CGFloat(source.height))
+        let left = min(max(0, box.minX - pad), CGFloat(width - 1))
+        let top = min(max(0, box.minY - padY), CGFloat(height - 1))
+        let right = min(max(left + 1, box.maxX + pad), CGFloat(width))
+        let bottom = min(max(top + 1, box.maxY + padY), CGFloat(height))
         return CGRect(x: left, y: top, width: right - left, height: bottom - top)
     }
 
-    // Returns the image itself for a whole turn.
     static func rotatedCopy(_ image: UIImage, degrees: Int) -> UIImage {
         let normalized = ((degrees % 360) + 360) % 360
         guard normalized != 0, let source = image.cgImage else { return image }

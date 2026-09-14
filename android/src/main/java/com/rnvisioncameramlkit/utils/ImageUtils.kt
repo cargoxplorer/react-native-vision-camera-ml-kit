@@ -8,6 +8,7 @@ import android.graphics.Matrix
 import android.media.Image
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
+import kotlin.math.max
 
 /**
  * Utility class for efficient image cloning and conversion.
@@ -134,7 +135,6 @@ object ImageUtils {
         return bitmap
     }
 
-    // Decodes to an upright bitmap (EXIF applied), matching InputImage.fromFilePath coordinates.
     fun decodeBitmap(context: Context, uri: Uri, extraRotationDegrees: Int = 0): Bitmap? {
         return try {
             val decoded = context.contentResolver.openInputStream(uri).use { stream ->
@@ -152,7 +152,6 @@ object ImageUtils {
         }
     }
 
-    // Recycles the input when a new bitmap is produced.
     fun rotate(bitmap: Bitmap, degrees: Int): Bitmap {
         val normalized = ((degrees % 360) + 360) % 360
         if (normalized == 0) return bitmap
@@ -170,10 +169,94 @@ object ImageUtils {
             else -> 0
         }
 
-    /**
-     * Clear thread-local buffers to free memory.
-     * Call this when the plugin is being destroyed.
-     */
+    class LumaPlane {
+        var bytes = ByteArray(0)
+            private set
+        var width = 0
+            internal set
+        var height = 0
+            internal set
+        var step = 1
+            internal set
+        internal var rows = ByteArray(0)
+
+        internal fun ensure(count: Int, rowBytes: Int) {
+            if (bytes.size < count) bytes = ByteArray(count)
+            if (rows.size < rowBytes) rows = ByteArray(rowBytes)
+        }
+
+        internal fun set(bytes: ByteArray, width: Int, height: Int, step: Int) {
+            this.bytes = bytes
+            this.width = width
+            this.height = height
+            this.step = step
+        }
+    }
+
+    fun readLuma(image: Image, rotationDegrees: Int, longSide: Int, into: LumaPlane) {
+        val plane = image.planes[0]
+        val buffer = plane.buffer.duplicate()
+        val rowStride = plane.rowStride
+        val pixelStride = plane.pixelStride
+        val sourceWidth = image.width
+        val sourceHeight = image.height
+        val step = max(1, max(sourceWidth, sourceHeight) / longSide)
+        val width = sourceWidth / step
+        val height = sourceHeight / step
+        val rowLength = (sourceWidth - 1) * pixelStride + 1
+        into.ensure(width * height, rowLength * step)
+        val out = into.bytes
+        val rows = into.rows
+        val rotation = (rotationDegrees % 360 + 360) % 360
+        val samples = step * step
+        val half = samples / 2
+
+        for (dy in 0 until height) {
+            for (s in 0 until step) {
+                buffer.position((dy * step + s) * rowStride)
+                buffer.get(rows, s * rowLength, rowLength)
+            }
+            var index: Int
+            val strideX: Int
+            when (rotation) {
+                90 -> { index = height - 1 - dy; strideX = height }
+                180 -> { index = (height - 1 - dy) * width + (width - 1); strideX = -1 }
+                270 -> { index = (width - 1) * height + dy; strideX = -height }
+                else -> { index = dy * width; strideX = 1 }
+            }
+            if (step == 1 && pixelStride == 1) {
+                for (dx in 0 until width) {
+                    out[index] = rows[dx]
+                    index += strideX
+                }
+            } else if (step == 2 && pixelStride == 1) {
+                var offset = 0
+                for (dx in 0 until width) {
+                    val sum = (rows[offset].toInt() and 0xFF) + (rows[offset + 1].toInt() and 0xFF) +
+                        (rows[rowLength + offset].toInt() and 0xFF) + (rows[rowLength + offset + 1].toInt() and 0xFF)
+                    out[index] = ((sum + 2) shr 2).toByte()
+                    index += strideX
+                    offset += 2
+                }
+            } else {
+                for (dx in 0 until width) {
+                    var sum = 0
+                    val offset = dx * step * pixelStride
+                    for (s in 0 until step) {
+                        val rowOffset = s * rowLength + offset
+                        for (t in 0 until step) sum += rows[rowOffset + t * pixelStride].toInt() and 0xFF
+                    }
+                    out[index] = ((sum + half) / samples).toByte()
+                    index += strideX
+                }
+            }
+        }
+
+        into.width = if (rotation % 180 == 0) width else height
+        into.height = if (rotation % 180 == 0) height else width
+        into.step = step
+    }
+
     fun clearBuffers() {
         rgbBufferLocal.remove()
     }

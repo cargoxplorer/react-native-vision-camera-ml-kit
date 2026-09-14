@@ -67,6 +67,13 @@ export interface TextRecognitionOptions {
    * @default 'horizontal'
    */
   textLayout?: TextLayout;
+
+  /**
+   * Frame processor only: copy the frame, release it and recognize on a background thread.
+   * A call returns the result of the previous frame once it is ready, otherwise null.
+   * @default false
+   */
+  async?: boolean;
 }
 
 /**

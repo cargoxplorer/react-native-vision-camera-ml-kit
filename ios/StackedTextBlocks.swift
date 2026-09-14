@@ -32,7 +32,6 @@ enum TextLayout: String {
     }
 }
 
-// Serializes a stacked column in the same shape as ML Kit blocks, plus `stacked: true`.
 enum StackedTextBlocks {
 
     static func toDictionary(_ block: StackedTextReader.StackedBlock) -> [String: Any] {

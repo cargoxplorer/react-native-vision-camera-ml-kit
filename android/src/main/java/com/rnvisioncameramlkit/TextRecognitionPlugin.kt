@@ -26,13 +26,11 @@ import com.rnvisioncameramlkit.stacked.StackedTextReader
 import com.rnvisioncameramlkit.stacked.TextLayout
 import com.rnvisioncameramlkit.utils.ImageUtils
 import com.rnvisioncameramlkit.utils.Logger
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 
-/**
- * Text Recognition v2 Frame Processor Plugin
- *
- * Performs on-device text recognition using Google ML Kit
- * Supports multiple scripts: Latin, Chinese, Devanagari, Japanese, Korean
- */
 class TextRecognitionPlugin(
     proxy: VisionCameraProxy,
     options: Map<String, Any>?
@@ -40,7 +38,20 @@ class TextRecognitionPlugin(
 
     private var recognizer: TextRecognizer
     private val textLayout: TextLayout
+    private val async: Boolean
     private val stackedReader: StackedTextReader by lazy { StackedTextReader() }
+    private val stackedExecutorDelegate = lazy {
+        Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "stacked-text") }
+    }
+    private val stackedExecutor: ExecutorService by stackedExecutorDelegate
+    private val processingExecutorDelegate = lazy {
+        Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "text-recognition") }
+    }
+    private val processingExecutor: ExecutorService by processingExecutorDelegate
+    private val luma = ImageUtils.LumaPlane()
+    private var pendingResult: Future<HashMap<String, Any?>?>? = null
+
+    private class Captured(val bitmap: Bitmap, val rotationDegrees: Int, val stacked: Boolean, val startTime: Long)
 
     init {
         val language = options?.get("language")?.toString() ?: "latin"
@@ -60,22 +71,15 @@ class TextRecognitionPlugin(
 
         recognizer = TextRecognition.getClient(recognizerOptions)
         textLayout = TextLayout.from(options?.get("textLayout")?.toString())
-        Logger.info("Text recognition initialized successfully (textLayout: $textLayout)")
+        async = options?.get("async") == true
+        Logger.info("Text recognition initialized successfully (textLayout: $textLayout, async: $async)")
     }
 
-    /**
-     * Cleanup resources when plugin is destroyed.
-     * Note: Vision Camera v4 does not provide explicit lifecycle callbacks for plugins.
-     * ML Kit's TextRecognizer implements Closeable, so resources will be freed when
-     * the plugin instance is garbage collected. For manual cleanup, this method can
-     * be called externally if needed.
-     */
     override fun close() {
         try {
-            // Clear ImageUtils thread-local buffers
             ImageUtils.clearBuffers()
-
-            // Close ML Kit recognizer to release native resources
+            if (processingExecutorDelegate.isInitialized()) processingExecutor.shutdown()
+            if (stackedExecutorDelegate.isInitialized()) stackedExecutor.shutdown()
             recognizer.close()
             Logger.debug("Text recognizer resources cleaned up successfully")
         } catch (e: Exception) {
@@ -85,85 +89,126 @@ class TextRecognitionPlugin(
 
     override fun callback(frame: Frame, arguments: Map<String, Any>?): Any? {
         val startTime = System.currentTimeMillis()
-
         try {
-            val mediaImage: Image = frame.image
-            val imageProxy = frame.imageProxy
-            val rotationDegrees = imageProxy.imageInfo.rotationDegrees
-
-            if (Logger.isDebugEnabled()) {
-                Logger.debug("Processing frame: ${frame.width}x${frame.height}, rotation: $rotationDegrees")
+            if (!async) {
+                val captured = capture(frame, startTime) ?: return null
+                return process(captured)
             }
 
-            // Clone image to bitmap to work with a stable copy during ML Kit processing.
-            // Note: We do NOT close imageProxy here - Vision Camera's frame processor pipeline
-            // manages frame lifecycle via withFrameRefCounting. Closing it here breaks
-            // multi-detector scenarios where multiple plugins process the same frame.
-            val clonedBitmap = ImageUtils.imageToBitmap(mediaImage, 0)  // Don't apply rotation yet
+            val pending = pendingResult
+            if (pending != null && !pending.isDone) return null
+            pendingResult = null
+            val finished = pending?.let { takeResult(it) }
 
-            if (clonedBitmap == null) {
-                Logger.error("Failed to clone camera image to bitmap")
-                return null
-            }
-
-            try {
-                // Use InputImage.fromBitmap with the cloned bitmap (not the original mediaImage)
-                val image = InputImage.fromBitmap(clonedBitmap, rotationDegrees)
-
-                val task: Task<Text> = recognizer.process(image)
-                val text: Text = Tasks.await(task)
-
-                val stackedBlocks = if (textLayout.shouldReadStacked(text)) {
-                    readStackedColumns(clonedBitmap, rotationDegrees)
-                } else {
-                    emptyList()
-                }
-
-                val processingTime = System.currentTimeMillis() - startTime
-                Logger.performance("Text recognition processing", processingTime)
-
-                if (text.text.isEmpty() && stackedBlocks.isEmpty()) {
-                    Logger.debug("No text detected in frame")
-                    return null
-                }
-
-                Logger.debug("Text detected: ${text.text.length} characters, ${text.textBlocks.size} blocks, ${stackedBlocks.size} stacked")
-
-                val blocks = processBlocks(text.textBlocks)
-                stackedBlocks.forEach { blocks.pushMap(StackedTextBlocks.toMap(it)) }
-
-                val result = WritableNativeMap().apply {
-                    putString("text", StackedTextBlocks.combineText(text.text, stackedBlocks))
-                    putArray("blocks", blocks)
-                }
-
-                return result.toHashMap()
-            } finally {
-                // Always recycle the cloned bitmap to free memory
-                clonedBitmap.recycle()
-            }
-
+            val captured = capture(frame, startTime) ?: return finished
+            pendingResult = processingExecutor.submit(Callable { process(captured) })
+            return finished
         } catch (e: Exception) {
-            val processingTime = System.currentTimeMillis() - startTime
             Logger.error("Error during text recognition", e)
-            Logger.performance("Text recognition processing (error)", processingTime)
+            Logger.performance("Text recognition processing (error)", System.currentTimeMillis() - startTime)
             return null
         }
     }
 
-    // The detector needs upright glyphs, so the pixels are rotated rather than tagged.
-    private fun readStackedColumns(
-        clonedBitmap: Bitmap,
-        rotationDegrees: Int
-    ): List<StackedTextReader.StackedBlock> {
-        val upright = StackedTextReader.rotatedCopy(clonedBitmap, rotationDegrees)
-        return try {
-            stackedReader.read(upright, recognizer, STACKED_TIMEOUT_SECONDS)
+    private fun takeResult(pending: Future<HashMap<String, Any?>?>): HashMap<String, Any?>? =
+        try {
+            pending.get()
+        } catch (e: Exception) {
+            Logger.error("Error during text recognition", e)
+            null
+        }
+
+    private fun capture(frame: Frame, startTime: Long): Captured? {
+        val mediaImage: Image = frame.image
+        val rotationDegrees = frame.imageProxy.imageInfo.rotationDegrees
+
+        if (Logger.isDebugEnabled()) {
+            Logger.debug("Processing frame: ${frame.width}x${frame.height}, rotation: $rotationDegrees")
+        }
+
+        val clonedBitmap = ImageUtils.imageToBitmap(mediaImage, 0)
+        if (clonedBitmap == null) {
+            Logger.error("Failed to clone camera image to bitmap")
+            return null
+        }
+
+        val stacked = textLayout != TextLayout.HORIZONTAL
+        if (stacked) {
+            try {
+                ImageUtils.readLuma(mediaImage, rotationDegrees, StackedTextReader.FRAME_DETECTION_LONG_SIDE, luma)
+            } catch (e: Exception) {
+                clonedBitmap.recycle()
+                throw e
+            }
+        }
+        return Captured(clonedBitmap, rotationDegrees, stacked, startTime)
+    }
+
+    private fun process(captured: Captured): HashMap<String, Any?>? {
+        val clonedBitmap = captured.bitmap
+        val rotationDegrees = captured.rotationDegrees
+        var pending: Future<List<StackedTextReader.Prepared>>? = null
+        try {
+            if (textLayout == TextLayout.STACKED) {
+                pending = stackedExecutor.submit(Callable { stackedReader.prepare(luma, clonedBitmap, rotationDegrees) })
+            }
+
+            val image = InputImage.fromBitmap(clonedBitmap, rotationDegrees)
+            val task: Task<Text> = recognizer.process(image)
+            val text: Text = Tasks.await(task)
+
+            val stackedBlocks = when {
+                pending != null -> {
+                    val prepared = awaitPrepared(pending)
+                    pending = null
+                    stackedReader.recognize(prepared, recognizer, STACKED_TIMEOUT_SECONDS)
+                }
+                captured.stacked && textLayout.shouldReadStacked(text) -> readStackedColumns(clonedBitmap, rotationDegrees)
+                else -> emptyList()
+            }
+
+            Logger.performance("Text recognition processing", System.currentTimeMillis() - captured.startTime)
+
+            if (text.text.isEmpty() && stackedBlocks.isEmpty()) {
+                Logger.debug("No text detected in frame")
+                return null
+            }
+
+            Logger.debug("Text detected: ${text.text.length} characters, ${text.textBlocks.size} blocks, ${stackedBlocks.size} stacked")
+
+            val blocks = processBlocks(text.textBlocks)
+            stackedBlocks.forEach { blocks.pushMap(StackedTextBlocks.toMap(it)) }
+
+            val result = WritableNativeMap().apply {
+                putString("text", StackedTextBlocks.combineText(text.text, stackedBlocks))
+                putArray("blocks", blocks)
+            }
+            return result.toHashMap()
+        } catch (e: Exception) {
+            Logger.error("Error during text recognition", e)
+            Logger.performance("Text recognition processing (error)", System.currentTimeMillis() - captured.startTime)
+            return null
+        } finally {
+            pending?.let { awaitPrepared(it).forEach { prepared -> prepared.strip.recycle() } }
+            clonedBitmap.recycle()
+        }
+    }
+
+    private fun awaitPrepared(pending: Future<List<StackedTextReader.Prepared>>): List<StackedTextReader.Prepared> =
+        try {
+            pending.get()
         } catch (e: Exception) {
             Logger.error("Stacked text pass failed", e)
             emptyList()
-        } finally {
-            if (upright !== clonedBitmap) upright.recycle()
+        }
+
+    private fun readStackedColumns(clonedBitmap: Bitmap, rotationDegrees: Int): List<StackedTextReader.StackedBlock> {
+        return try {
+            val prepared = stackedReader.prepare(luma, clonedBitmap, rotationDegrees)
+            stackedReader.recognize(prepared, recognizer, STACKED_TIMEOUT_SECONDS)
+        } catch (e: Exception) {
+            Logger.error("Stacked text pass failed", e)
+            emptyList()
         }
     }
 

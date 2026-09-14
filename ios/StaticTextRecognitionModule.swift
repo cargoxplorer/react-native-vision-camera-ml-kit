@@ -72,7 +72,6 @@ class StaticTextRecognitionModule: NSObject {
                 return
             }
 
-            // The stacked pass needs upright pixels, so EXIF and the orientation option are baked in.
             let stackedSource: UIImage? = textLayout == .horizontal
                 ? nil
                 : Self.uprightCopy(image, extraDegrees: orientation)
@@ -119,7 +118,6 @@ class StaticTextRecognitionModule: NSObject {
                     return
                 }
 
-                // The synchronous recognizer must not run on the main queue this completion arrives on.
                 DispatchQueue.global(qos: .userInitiated).async {
                     finish(StackedTextReader().readWithRotationFallback(source, recognizer: recognizer))
                 }

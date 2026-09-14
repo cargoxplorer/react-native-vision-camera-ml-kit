@@ -25,6 +25,14 @@ describe('textLayout', () => {
     }
   );
 
+  it('passes async to the frame processor plugin', () => {
+    createTextRecognitionPlugin({ textLayout: 'stacked', async: true });
+
+    expect(
+      mockVisionCameraProxy.initFrameProcessorPlugin
+    ).toHaveBeenCalledWith('scanTextV2', { textLayout: 'stacked', async: true });
+  });
+
   it('forwards textLayout to the static module', async () => {
     await recognizeTextFromImage({
       uri: 'file:///door.jpg',

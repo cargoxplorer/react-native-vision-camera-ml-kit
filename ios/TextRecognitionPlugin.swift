@@ -18,7 +18,22 @@ public class TextRecognitionPlugin: FrameProcessorPlugin {
 
     private var textRecognizer: TextRecognizer!
     private var textLayout: TextLayout = .horizontal
+    private var async = false
     private lazy var stackedReader = StackedTextReader()
+    private let stackedQueue = DispatchQueue(label: "stacked-text", qos: .userInitiated)
+    private let processingQueue = DispatchQueue(label: "text-recognition", qos: .userInitiated)
+    private let luma = ImageUtils.LumaPlane()
+    private let lock = NSLock()
+    private var processing = false
+    private var pendingResult: [String: Any]?
+
+    private struct Captured {
+        let image: UIImage
+        let orientation: UIImage.Orientation
+        let degrees: Int
+        let stacked: Bool
+        let startTime: Date
+    }
 
     public override init(proxy: VisionCameraProxyHolder, options: [AnyHashable: Any]! = [:]) {
         super.init(proxy: proxy, options: options)
@@ -43,50 +58,107 @@ public class TextRecognitionPlugin: FrameProcessorPlugin {
         }
 
         textLayout = TextLayout.from(options["textLayout"])
-        Logger.info("Text recognition initialized successfully (textLayout: \(textLayout.rawValue))")
+        async = options["async"] as? Bool ?? false
+        Logger.info("Text recognition initialized successfully (textLayout: \(textLayout.rawValue), async: \(async))")
     }
 
     deinit {
-        // Clean up ML Kit resources when plugin is deallocated
-        // Swift ARC will handle the deallocation, but we log for debugging
         Logger.debug("TextRecognitionPlugin deallocating - ML Kit recognizer resources will be freed")
-        // Note: ML Kit resources are automatically freed by ARC when textRecognizer is deallocated
     }
 
     public override func callback(_ frame: Frame, withArguments arguments: [AnyHashable: Any]?) -> Any? {
         let startTime = Date()
 
-        do {
-            let orientation = frame.orientation
+        if !async {
+            guard let captured = capture(frame, startTime: startTime) else { return nil }
+            return process(captured)
+        }
 
-            // Clone the camera buffer to UIImage to release the original buffer immediately
-            // This prevents buffer exhaustion issues when ML Kit processing takes longer than camera frame rate
-            guard let clonedImage = ImageUtils.imageFromSampleBuffer(frame.buffer) else {
-                Logger.error("Failed to create vision image from sample buffer")
-                return nil
+        lock.lock()
+        if processing {
+            lock.unlock()
+            return nil
+        }
+        let finished = pendingResult
+        pendingResult = nil
+        lock.unlock()
+
+        guard let captured = capture(frame, startTime: startTime) else { return finished }
+        lock.lock()
+        processing = true
+        lock.unlock()
+        processingQueue.async { [self] in
+            let result = process(captured)
+            lock.lock()
+            pendingResult = result
+            processing = false
+            lock.unlock()
+        }
+        return finished
+    }
+
+    private func capture(_ frame: Frame, startTime: Date) -> Captured? {
+        let orientation = frame.orientation
+
+        guard let clonedImage = ImageUtils.imageFromSampleBuffer(frame.buffer) else {
+            Logger.error("Failed to create vision image from sample buffer")
+            return nil
+        }
+        let imageOrientation = getOrientation(orientation: orientation)
+
+        Logger.debug("Processing frame: \(frame.width)x\(frame.height), orientation: \(orientation.rawValue)")
+
+        let degrees = TextRecognitionPlugin.rotationDegrees(for: imageOrientation)
+        var stacked = false
+        if textLayout != .horizontal, let pixelBuffer = CMSampleBufferGetImageBuffer(frame.buffer) {
+            stacked = ImageUtils.readLuma(pixelBuffer, rotationDegrees: degrees, longSide: StackedTextReader.frameDetectionLongSide, into: luma)
+        }
+        return Captured(image: clonedImage, orientation: imageOrientation, degrees: degrees, stacked: stacked, startTime: startTime)
+    }
+
+    private func process(_ captured: Captured) -> [String: Any]? {
+        let clonedImage = captured.image
+        let degrees = captured.degrees
+        let visionImage = VisionImage(image: clonedImage)
+        visionImage.orientation = captured.orientation
+
+        let uprightSize = degrees % 180 == 0 ? clonedImage.size : CGSize(width: clonedImage.size.height, height: clonedImage.size.width)
+        var prepared = [StackedTextReader.Prepared]()
+        let group = DispatchGroup()
+        var pending = false
+        if textLayout == .stacked, captured.stacked, let source = clonedImage.cgImage {
+            pending = true
+            group.enter()
+            stackedQueue.async { [self] in
+                prepared = stackedReader.prepare(luma: luma, source: source, rotationDegrees: degrees)
+                group.leave()
             }
-            let visionImage = VisionImage(image: clonedImage)
-            let imageOrientation = getOrientation(orientation: orientation)
-            visionImage.orientation = imageOrientation
+        }
 
-            Logger.debug("Processing frame: \(frame.width)x\(frame.height), orientation: \(orientation.rawValue)")
+        do {
+            let text: Text
+            do {
+                text = try textRecognizer.results(in: visionImage)
+            } catch {
+                if pending { group.wait() }
+                throw error
+            }
 
-            // Process synchronously
-            let text = try textRecognizer.results(in: visionImage)
-
-            // Runs on an upright copy; frames are mapped back into the buffer's coordinates.
             let stackedBlocks: [StackedTextReader.StackedBlock]
-            if textLayout.shouldReadStacked(text) {
-                let degrees = TextRecognitionPlugin.rotationDegrees(for: imageOrientation)
-                let upright = StackedTextReader.rotatedCopy(clonedImage, degrees: degrees)
+            if pending {
+                group.wait()
                 stackedBlocks = stackedReader
-                    .read(upright, recognizer: textRecognizer)
-                    .map { StackedTextReader.toSourceCoordinates($0, degrees: degrees, rotatedSize: upright.size) }
+                    .recognize(prepared, recognizer: textRecognizer)
+                    .map { StackedTextReader.toSourceCoordinates($0, degrees: degrees, rotatedSize: uprightSize) }
+            } else if captured.stacked, textLayout.shouldReadStacked(text), let source = clonedImage.cgImage {
+                stackedBlocks = stackedReader
+                    .recognize(stackedReader.prepare(luma: luma, source: source, rotationDegrees: degrees), recognizer: textRecognizer)
+                    .map { StackedTextReader.toSourceCoordinates($0, degrees: degrees, rotatedSize: uprightSize) }
             } else {
                 stackedBlocks = []
             }
 
-            let processingTime = Int64(Date().timeIntervalSince(startTime) * 1000)
+            let processingTime = Int64(Date().timeIntervalSince(captured.startTime) * 1000)
             Logger.performance("Text recognition processing", durationMs: processingTime)
 
             if text.text.isEmpty && stackedBlocks.isEmpty {
@@ -103,9 +175,8 @@ public class TextRecognitionPlugin: FrameProcessorPlugin {
                 "text": StackedTextBlocks.combineText(text.text, stackedBlocks),
                 "blocks": blocks
             ]
-
         } catch {
-            let processingTime = Int64(Date().timeIntervalSince(startTime) * 1000)
+            let processingTime = Int64(Date().timeIntervalSince(captured.startTime) * 1000)
             Logger.error("Error during text recognition: \(error.localizedDescription)")
             Logger.performance("Text recognition processing (error)", durationMs: processingTime)
             return nil

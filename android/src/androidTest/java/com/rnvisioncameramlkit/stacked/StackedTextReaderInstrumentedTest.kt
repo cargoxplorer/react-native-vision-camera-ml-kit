@@ -9,6 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.rnvisioncameramlkit.utils.ImageUtils
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -16,7 +17,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-// Needs a device or emulator with Google Play services.
 @RunWith(AndroidJUnit4::class)
 class StackedTextReaderInstrumentedTest {
 
@@ -45,15 +45,30 @@ class StackedTextReaderInstrumentedTest {
     fun readsAContainerNumberPaintedAsAColumn() {
         val door = renderDoor(CONTAINER_NUMBER)
         try {
-            val blocks = reader.read(door, recognizer, 30)
-
-            assertEquals(1, blocks.size)
-            val block = blocks.single()
-            assertEquals(CONTAINER_NUMBER, block.text.filter { it.isLetterOrDigit() }.uppercase())
-            assertEquals(CONTAINER_NUMBER.length, block.glyphs.size)
-            block.glyphs.forEach { assertTrue(block.bounds.contains(it.box)) }
+            assertReadsTheColumn(reader.read(door, recognizer, 30))
         } finally {
             door.recycle()
+        }
+    }
+
+    @Test
+    fun readsAColumnFromALumaPlaneOfARotatedFrame() {
+        val door = renderDoor(CONTAINER_NUMBER)
+        val lying = StackedTextReader.rotatedCopy(door, 270)
+        try {
+            val luma = ImageUtils.LumaPlane()
+            luma.set(halvedLuma(door), door.width / 2, door.height / 2, 2)
+
+            val upright = reader.recognize(reader.prepare(luma, door, 0), recognizer, 30)
+            val rotated = reader.recognize(reader.prepare(luma, lying, 90), recognizer, 30)
+
+            assertReadsTheColumn(upright)
+            assertReadsTheColumn(rotated)
+            assertEquals(upright.single().bounds, rotated.single().bounds)
+            assertEquals(upright.single().glyphs.map { it.box }, rotated.single().glyphs.map { it.box })
+        } finally {
+            door.recycle()
+            lying.recycle()
         }
     }
 
@@ -67,6 +82,32 @@ class StackedTextReaderInstrumentedTest {
             blank.recycle()
         }
     }
+
+    private fun assertReadsTheColumn(blocks: List<StackedTextReader.StackedBlock>) {
+        assertEquals(1, blocks.size)
+        val block = blocks.single()
+        assertEquals(CONTAINER_NUMBER, block.text.filter { it.isLetterOrDigit() }.uppercase())
+        assertEquals(CONTAINER_NUMBER.length, block.glyphs.size)
+        block.glyphs.forEach { assertTrue(block.bounds.contains(it.box)) }
+    }
+
+    private fun halvedLuma(bitmap: Bitmap): ByteArray {
+        val width = bitmap.width / 2
+        val height = bitmap.height / 2
+        val pixels = IntArray(bitmap.width * bitmap.height)
+        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        val luma = ByteArray(width * height)
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val i = 2 * y * bitmap.width + 2 * x
+                val sum = grey(pixels[i]) + grey(pixels[i + 1]) + grey(pixels[i + bitmap.width]) + grey(pixels[i + bitmap.width + 1])
+                luma[y * width + x] = ((sum + 2) shr 2).toByte()
+            }
+        }
+        return luma
+    }
+
+    private fun grey(colour: Int): Int = (Color.red(colour) * 299 + Color.green(colour) * 587 + Color.blue(colour) * 114) / 1000
 
     private fun renderDoor(number: String): Bitmap {
         val bitmap = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)

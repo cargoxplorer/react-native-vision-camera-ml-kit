@@ -3,6 +3,7 @@ package com.rnvisioncameramlkit.stacked
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.random.Random
 
 class StackedTextDetectorTest {
 
@@ -38,7 +39,10 @@ class StackedTextDetectorTest {
             }
         }
 
-        fun detect(): List<StackedTextDetector.Column> = StackedTextDetector.detect(pixels, width, height)
+        fun detect(workspace: StackedTextDetector.Workspace = StackedTextDetector.Workspace()): List<StackedTextDetector.Column> =
+            StackedTextDetector.detect(pixels, width, height, workspace)
+
+        fun luma(): ByteArray = ByteArray(width * height) { (pixels[it] and 0xFF).toByte() }
 
         private fun grey(value: Int) = (0xFF shl 24) or (value shl 16) or (value shl 8) or value
     }
@@ -105,5 +109,72 @@ class StackedTextDetectorTest {
         val row = Image(WIDTH, HEIGHT, DARK_BACKGROUND)
         for (i in 0 until 10) row.fill(5 + i * 22, 300, GLYPH_WIDTH, GLYPH_HEIGHT, WHITE_PAINT)
         assertTrue(row.detect().isEmpty())
+    }
+
+    @Test
+    fun `drops outliers at the column ends`() {
+        val image = Image(WIDTH, HEIGHT, DARK_BACKGROUND)
+        image.paintColumn(centerX = 120, value = WHITE_PAINT)
+        val below = FIRST_GLYPH_TOP + CONTAINER_NUMBER_LENGTH * GLYPH_PITCH
+        image.fill(117, below, 6, 6, WHITE_PAINT)
+        image.fill(117, below + 12, 6, 6, WHITE_PAINT)
+
+        val column = image.detect().single()
+        val refined = StackedTextDetector.refine(column)
+
+        assertEquals(CONTAINER_NUMBER_LENGTH + 2, column.glyphs.size)
+        assertEquals(CONTAINER_NUMBER_LENGTH, refined.glyphs.size)
+        assertEquals(column.glyphs.take(CONTAINER_NUMBER_LENGTH), refined.glyphs)
+    }
+
+    @Test
+    fun `luma path equals ARGB path`() {
+        val image = Image(WIDTH, HEIGHT, DARK_BACKGROUND)
+        image.paintColumn(centerX = 70, value = WHITE_PAINT)
+        image.paintColumn(centerX = 180, value = 200)
+
+        assertEquals(image.detect(), StackedTextDetector.detect(image.luma(), WIDTH, HEIGHT))
+    }
+
+    @Test
+    fun `labels components identically to the reference BFS`() {
+        val random = Random(304)
+        val workspace = StackedTextDetector.Workspace()
+        repeat(200) {
+            val width = 40 + random.nextInt(120)
+            val height = 40 + random.nextInt(160)
+            val luma = ByteArray(width * height) { if (random.nextFloat() < 0.35f) 255.toByte() else 0 }
+            repeat(random.nextInt(8)) {
+                val boxWidth = 1 + random.nextInt(12)
+                val boxHeight = 1 + random.nextInt(16)
+                val left = random.nextInt(width - boxWidth)
+                val top = random.nextInt(height - boxHeight)
+                for (y in top until top + boxHeight) {
+                    for (x in left until left + boxWidth) luma[y * width + x] = 255.toByte()
+                }
+            }
+            assertLabelsMatch(workspace, luma, width, height)
+        }
+    }
+
+    private fun assertLabelsMatch(workspace: StackedTextDetector.Workspace, luma: ByteArray, width: Int, height: Int) {
+        for ((bright, threshold) in listOf(true to 180, true to 210, true to 150, false to 90)) {
+            val mask = ReferenceLabeller.mask(luma, width * height, bright, threshold)
+            val expected = ReferenceLabeller.label(mask, width, height)
+            val actual = StackedTextDetector.labelGlyphs(workspace, luma, luma, width, height, bright, threshold)
+            assertEquals("${width}x$height bright=$bright T=$threshold", expected, actual)
+        }
+    }
+
+    @Test
+    fun `keeps a narrow last glyph`() {
+        val image = Image(WIDTH, HEIGHT, DARK_BACKGROUND)
+        image.paintColumn(centerX = 120, value = WHITE_PAINT, count = CONTAINER_NUMBER_LENGTH - 1)
+        image.fill(117, FIRST_GLYPH_TOP + (CONTAINER_NUMBER_LENGTH - 1) * GLYPH_PITCH, 6, GLYPH_HEIGHT, WHITE_PAINT)
+
+        val column = image.detect().single()
+
+        assertEquals(CONTAINER_NUMBER_LENGTH, column.glyphs.size)
+        assertEquals(CONTAINER_NUMBER_LENGTH, StackedTextDetector.refine(column).glyphs.size)
     }
 }
