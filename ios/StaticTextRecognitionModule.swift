@@ -5,6 +5,7 @@
 
 import Foundation
 import React
+import UIKit
 import MLKitVision
 import MLKitTextRecognition
 import MLKitTextRecognitionChinese
@@ -34,8 +35,9 @@ class StaticTextRecognitionModule: NSObject {
 
         let language = (options["language"] as? String ?? "latin").lowercased()
         let orientation = options["orientation"] as? Int ?? 0
+        let textLayout = TextLayout.from(options["textLayout"])
 
-        Logger.debug("Recognizing text from static image: \(uri) (language: \(language), orientation: \(orientation))")
+        Logger.debug("Recognizing text from static image: \(uri) (language: \(language), orientation: \(orientation), textLayout: \(textLayout.rawValue))")
 
         // Create recognizer based on language
         let recognizer: TextRecognizer
@@ -70,8 +72,12 @@ class StaticTextRecognitionModule: NSObject {
                 return
             }
 
-            let visionImage = VisionImage(image: image)
-            visionImage.orientation = self.imageOrientation(orientation)
+            let stackedSource: UIImage? = textLayout == .horizontal
+                ? nil
+                : Self.uprightCopy(image, extraDegrees: orientation)
+
+            let visionImage = VisionImage(image: stackedSource ?? image)
+            visionImage.orientation = stackedSource == nil ? self.imageOrientation(orientation) : .up
 
             // Process image
             recognizer.process(visionImage) { text, error in
@@ -84,22 +90,37 @@ class StaticTextRecognitionModule: NSObject {
                     return
                 }
 
-                Logger.performance("Static text recognition processing", durationMs: processingTime)
+                let finish: ([StackedTextReader.StackedBlock]) -> Void = { stackedBlocks in
+                    Logger.performance("Static text recognition processing", durationMs: processingTime)
 
-                guard let text = text, !text.text.isEmpty else {
-                    Logger.debug("No text detected in static image")
-                    resolve(NSNull())
+                    let recognized = text?.text ?? ""
+                    if recognized.isEmpty && stackedBlocks.isEmpty {
+                        Logger.debug("No text detected in static image")
+                        resolve(NSNull())
+                        return
+                    }
+
+                    Logger.debug("Text detected in static image: \(recognized.count) characters, \(text?.blocks.count ?? 0) blocks, \(stackedBlocks.count) stacked")
+
+                    var blocks = self.processBlocks(text?.blocks ?? [])
+                    blocks.append(contentsOf: stackedBlocks.map { StackedTextBlocks.toDictionary($0) })
+
+                    let result: [String: Any] = [
+                        "text": StackedTextBlocks.combineText(recognized, stackedBlocks),
+                        "blocks": blocks
+                    ]
+
+                    resolve(result)
+                }
+
+                guard let source = stackedSource, textLayout.shouldReadStacked(text) else {
+                    finish([])
                     return
                 }
 
-                Logger.debug("Text detected in static image: \(text.text.count) characters, \(text.blocks.count) blocks")
-
-                let result: [String: Any] = [
-                    "text": text.text,
-                    "blocks": self.processBlocks(text.blocks)
-                ]
-
-                resolve(result)
+                DispatchQueue.global(qos: .userInitiated).async {
+                    finish(StackedTextReader().readWithRotationFallback(source, recognizer: recognizer))
+                }
             }
         }
     }
@@ -143,6 +164,16 @@ class StaticTextRecognitionModule: NSObject {
                 completion(nil, NSError(domain: "ImageLoadError", code: 5, userInfo: [NSLocalizedDescriptionKey: "Failed to load image from path"]))
             }
         }
+    }
+
+    private static func uprightCopy(_ image: UIImage, extraDegrees: Int) -> UIImage {
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        format.opaque = true
+        let baked = UIGraphicsImageRenderer(size: image.size, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: image.size))
+        }
+        return StackedTextReader.rotatedCopy(baked, degrees: extraDegrees)
     }
 
     private func imageOrientation(_ orientation: Int) -> UIImage.Orientation {

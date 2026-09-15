@@ -1,5 +1,6 @@
 package com.rnvisioncameramlkit
 
+import android.graphics.Bitmap
 import android.graphics.Point
 import android.graphics.Rect
 import android.net.Uri
@@ -22,6 +23,10 @@ import com.google.mlkit.vision.text.devanagari.DevanagariTextRecognizerOptions
 import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
 import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.rnvisioncameramlkit.stacked.StackedTextBlocks
+import com.rnvisioncameramlkit.stacked.StackedTextReader
+import com.rnvisioncameramlkit.stacked.TextLayout
+import com.rnvisioncameramlkit.utils.ImageUtils
 import com.rnvisioncameramlkit.utils.Logger
 import java.io.IOException
 
@@ -55,8 +60,9 @@ class StaticTextRecognitionModule(reactContext: ReactApplicationContext) :
 
             val language = options.getString("language") ?: "latin"
             val orientation = if (options.hasKey("orientation")) options.getInt("orientation") else 0
+            val textLayout = TextLayout.from(options.getString("textLayout"))
 
-            Logger.debug("Recognizing text from static image: $uri (language: $language, orientation: $orientation)")
+            Logger.debug("Recognizing text from static image: $uri (language: $language, orientation: $orientation, textLayout: $textLayout)")
 
             // Create recognizer based on language
             val recognizerOptions: TextRecognizerOptionsInterface = when (language.lowercase()) {
@@ -73,17 +79,20 @@ class StaticTextRecognitionModule(reactContext: ReactApplicationContext) :
 
             val recognizer: TextRecognizer = TextRecognition.getClient(recognizerOptions)
 
-            // Load image from URI
-            val parsedUri = Uri.parse(uri)
+            val parsedUri = resolvedUri(uri)
+            val needsBitmap = textLayout != TextLayout.HORIZONTAL || orientation != 0
+            var bitmap: Bitmap? = null
+
             val image: InputImage = try {
-                when {
-                    uri.startsWith("file://") || uri.startsWith("content://") -> {
-                        InputImage.fromFilePath(reactApplicationContext, parsedUri)
+                if (needsBitmap) {
+                    bitmap = ImageUtils.decodeBitmap(reactApplicationContext, parsedUri, orientation)
+                    if (bitmap == null) {
+                        promise.reject("IMAGE_LOAD_ERROR", "Failed to decode image: $uri")
+                        return
                     }
-                    else -> {
-                        // Try as file path
-                        InputImage.fromFilePath(reactApplicationContext, Uri.parse("file://$uri"))
-                    }
+                    InputImage.fromBitmap(bitmap, 0)
+                } else {
+                    InputImage.fromFilePath(reactApplicationContext, parsedUri)
                 }
             } catch (e: IOException) {
                 Logger.error("Failed to load image from URI: $uri", e)
@@ -97,20 +106,30 @@ class StaticTextRecognitionModule(reactContext: ReactApplicationContext) :
             try {
                 val text: Text = Tasks.await(task)
 
+                val source = bitmap
+                val stackedBlocks = if (textLayout.shouldReadStacked(text) && source != null) {
+                    StackedTextReader().readWithRotationFallback(source, recognizer, STACKED_TIMEOUT_SECONDS)
+                } else {
+                    emptyList()
+                }
+
                 val processingTime = System.currentTimeMillis() - startTime
                 Logger.performance("Static text recognition processing", processingTime)
 
-                if (text.text.isEmpty()) {
+                if (text.text.isEmpty() && stackedBlocks.isEmpty()) {
                     Logger.debug("No text detected in static image")
                     promise.resolve(null)
                     return
                 }
 
-                Logger.debug("Text detected in static image: ${text.text.length} characters, ${text.textBlocks.size} blocks")
+                Logger.debug("Text detected in static image: ${text.text.length} characters, ${text.textBlocks.size} blocks, ${stackedBlocks.size} stacked")
+
+                val blocks = processBlocks(text.textBlocks)
+                stackedBlocks.forEach { blocks.pushMap(StackedTextBlocks.toMap(it)) }
 
                 val result = WritableNativeMap().apply {
-                    putString("text", text.text)
-                    putArray("blocks", processBlocks(text.textBlocks))
+                    putString("text", StackedTextBlocks.combineText(text.text, stackedBlocks))
+                    putArray("blocks", blocks)
                 }
 
                 promise.resolve(result)
@@ -122,6 +141,7 @@ class StaticTextRecognitionModule(reactContext: ReactApplicationContext) :
                 promise.reject("RECOGNITION_ERROR", "Text recognition failed: ${e.message}", e)
             } finally {
                 recognizer.close()
+                bitmap?.recycle()
             }
 
         } catch (e: Exception) {
@@ -131,6 +151,12 @@ class StaticTextRecognitionModule(reactContext: ReactApplicationContext) :
     }
 
     companion object {
+        private const val STACKED_TIMEOUT_SECONDS = 15L
+
+        private fun resolvedUri(uri: String): Uri =
+            if (uri.startsWith("file://") || uri.startsWith("content://")) Uri.parse(uri)
+            else Uri.parse("file://" + uri)
+
         /**
          * Process text blocks (reuse from TextRecognitionPlugin)
          */

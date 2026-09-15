@@ -18,6 +18,7 @@ import { Worklets } from 'react-native-worklets-core';
 import {
   useTextRecognition,
   TextRecognitionScript,
+  type TextLayout,
   type TextRecognitionResult,
 } from 'react-native-vision-camera-ml-kit';
 import { useAppLifecycle } from './utils/useAppLifecycle';
@@ -28,6 +29,7 @@ export default function TextRecognitionScreen() {
   const [language, setLanguage] = useState<TextRecognitionScript>(
     TextRecognitionScript.LATIN
   );
+  const [textLayout, setTextLayout] = useState<TextLayout>('horizontal');
   const [isActive, setIsActive] = useState(true);
 
   const device = useCameraDevice('back');
@@ -36,7 +38,10 @@ export default function TextRecognitionScreen() {
     { fps: 60 },
   ]);
   // Memoize options so the plugin isn't recreated on every render
-  const textOptions = React.useMemo(() => ({ language }), [language]);
+  const textOptions = React.useMemo(
+    () => ({ language, textLayout }),
+    [language, textLayout]
+  );
   const { scanText } = useTextRecognition(textOptions);
 
   React.useEffect(() => {
@@ -89,6 +94,14 @@ export default function TextRecognitionScreen() {
     { label: 'Korean', value: TextRecognitionScript.KOREAN },
   ];
 
+  const layouts: { label: string; value: TextLayout }[] = [
+    { label: 'Horizontal', value: 'horizontal' },
+    { label: 'Stacked', value: 'stacked' },
+    { label: 'Auto', value: 'auto' },
+  ];
+
+  const stackedBlocks = result?.blocks.filter((block) => block.stacked) ?? [];
+
   if (!hasPermission) {
     return (
       <View style={styles.container}>
@@ -123,6 +136,9 @@ export default function TextRecognitionScreen() {
           <View style={styles.overlay}>
             <Text style={styles.overlayText}>
               {result.blocks.length} block(s) detected
+              {stackedBlocks.length > 0
+                ? ` · ${stackedBlocks.length} stacked`
+                : ''}
             </Text>
           </View>
         )}
@@ -151,6 +167,32 @@ export default function TextRecognitionScreen() {
             </TouchableOpacity>
           ))}
         </ScrollView>
+
+        <Text style={[styles.controlsTitle, styles.controlsTitleSpaced]}>
+          Text layout:
+        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {layouts.map((layout) => (
+            <TouchableOpacity
+              key={layout.value}
+              style={[
+                styles.languageButton,
+                textLayout === layout.value && styles.languageButtonActive,
+              ]}
+              onPress={() => setTextLayout(layout.value)}
+            >
+              <Text
+                style={[
+                  styles.languageButtonText,
+                  textLayout === layout.value &&
+                    styles.languageButtonTextActive,
+                ]}
+              >
+                {layout.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       <View style={styles.results}>
@@ -159,6 +201,11 @@ export default function TextRecognitionScreen() {
           {result?.text ? (
             <>
               <Text style={styles.resultText}>{result.text}</Text>
+              {stackedBlocks.map((block, index) => (
+                <Text key={`stacked-${index}`} style={styles.stackedText}>
+                  stacked column: {block.text}
+                </Text>
+              ))}
               <Text style={styles.resultsMeta}>
                 {result.blocks.length} blocks,{' '}
                 {result.blocks.reduce((sum, b) => sum + b.lines.length, 0)}{' '}
@@ -209,6 +256,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     color: '#333',
   },
+  controlsTitleSpaced: {
+    marginTop: 12,
+  },
   languageButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -247,6 +297,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     lineHeight: 20,
+  },
+  stackedText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '600',
+    marginTop: 8,
   },
   resultsMeta: {
     fontSize: 12,
