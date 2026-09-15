@@ -291,22 +291,25 @@ ERROR Not authenticated with npm. Please `npm login` and try again.
 ```
 
 ### Cause
-Missing or invalid NPM_TOKEN, or token not properly exposed to npm.
+npm trusted publishing (OIDC) is not configured, or the workflow cannot mint an OIDC token.
 
 ### Solution
 
-1. Generate npm token: https://www.npmjs.com/settings/YOUR_USERNAME/tokens
-2. Add to GitHub Secrets as `NPM_TOKEN`
-3. Ensure token has "Automation" permissions
-4. **Important**: When using `setup-node` with `registry-url`, the token must be exposed as `NODE_AUTH_TOKEN`:
+1. On npmjs.com → package **Settings** → **Trusted Publisher**, add a GitHub Actions publisher for `cargoxplorer/react-native-vision-camera-ml-kit`, workflow `release.yml`
+2. Ensure the workflow grants `id-token: write`
+3. Ensure npm in the job is 11.5.1+ (the workflow runs `npm install -g npm@latest`)
+4. Set `"npm": { "skipChecks": true }` in `.release-it.json` so release-it does not run `npm whoami` (there is no token to check)
 
 ```yaml
+permissions:
+  contents: write
+  id-token: write # Required for OIDC
+
 - name: Release
   run: npm run release
   env:
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}  # Required for setup-node
-    NPM_TOKEN: ${{ secrets.NPM_TOKEN }}         # May be needed by release-it
+    # No NPM_TOKEN / NODE_AUTH_TOKEN needed
 ```
 
 ---
@@ -388,7 +391,7 @@ Before pushing to CI, verify:
 - [ ] Workspaces removed for npm publishing
 - [ ] Expo prebuild steps included in CI
 - [ ] Correct Xcode runner version (macos-15)
-- [ ] NPM_TOKEN configured for releases
+- [ ] npm trusted publisher (OIDC) configured for `release.yml`
 
 ---
 
