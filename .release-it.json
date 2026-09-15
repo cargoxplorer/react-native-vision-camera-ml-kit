@@ -17,7 +17,8 @@
     "publish": true,
     "publishPath": ".",
     "tag": "latest",
-    "otp": false
+    "otp": false,
+    "skipChecks": true
   },
   "github": {
     "release": true,
